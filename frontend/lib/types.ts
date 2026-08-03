@@ -1,55 +1,4 @@
-export type FileKind = "csv" | "xlsx" | "xls";
-
-export type ValidationCheckId =
-  | "extension"
-  | "size"
-  | "empty"
-  | "headers"
-  | "duplicateHeaders"
-  | "encoding";
-
-export interface ValidationCheck {
-  id: ValidationCheckId;
-  label: string;
-  passed: boolean;
-  detail: string;
-}
-
-export interface ValidationResult {
-  valid: boolean;
-  checks: ValidationCheck[];
-  errorTitle?: string;
-  errorMessage?: string;
-  suggestion?: string;
-}
-
-export interface DatasetInfo {
-  fileName: string;
-  fileKind: FileKind;
-  sizeBytes: number;
-  uploadedAt: string;
-  rows: number;
-  columns: number;
-  encoding: string;
-}
-
-export type PipelineStepId =
-  | "missingValues"
-  | "duplicates"
-  | "whitespace"
-  | "specialCharacters"
-  | "dataTypes"
-  | "outliers"
-  | "validation"
-  | "finalReport";
-
-export type StepStatus = "waiting" | "running" | "completed" | "error";
-
-export interface PipelineStep {
-  id: PipelineStepId;
-  label: string;
-  status: StepStatus;
-}
+// types.ts
 
 export interface CleaningStats {
   rowsBefore: number;
@@ -57,12 +6,15 @@ export interface CleaningStats {
   columnsBefore: number;
   columnsAfter: number;
   duplicatesRemoved: number;
-  missingValuesFixed: number;
+  missingValuesFixed: number;    // ✅ موجودة مسبقاً
   outliersDetected: number;
   columnsConverted: number;
   charactersCleaned: number;
   processingTimeMs: number;
   qualityScore: number;
+  // 👇 أضف هذه الحقول الجديدة لتتناسب مع الـ Backend
+  missingValuesFilled?: number;   // اختياري، لاستقبال القيمة من الـ Backend
+  columns?: string[];            // اختياري، قائمة بأسماء الأعمدة
 }
 
 export interface CleaningReport {
@@ -74,18 +26,9 @@ export interface CleaningReport {
   operations: { label: string; done: boolean }[];
   recommendations: string[];
   columnConversions: { column: string; from: string; to: string }[];
-  /** Present when the backend returns a direct link to the cleaned file. */
   downloadUrl?: string;
-}
-
-export interface HistoryEntry {
-  id: string;
-  originalFileName: string;
-  cleanedFileName: string;
-  cleaningDate: string;
-  processingTimeMs: number;
-  qualityScore: number;
-  report: CleaningReport;
-  cleanedRows: Record<string, unknown>[];
-  columns: string[];
+  // 👇 أضف هذه الحقول الجديدة لتتناسب مع الـ Backend
+  sample?: any[];      // اختياري، عينة من البيانات المنظفة
+  alerts?: string[];   // اختياري، تنبيهات من عملية التنظيف
+  summary?: string;    // اختياري، ملخص العملية
 }
