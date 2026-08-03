@@ -1,20 +1,17 @@
-// types.ts
-
 export interface CleaningStats {
   rowsBefore: number;
   rowsAfter: number;
   columnsBefore: number;
   columnsAfter: number;
   duplicatesRemoved: number;
-  missingValuesFixed: number;    // ✅ موجودة مسبقاً
+  missingValuesFixed: number;
   outliersDetected: number;
   columnsConverted: number;
   charactersCleaned: number;
   processingTimeMs: number;
   qualityScore: number;
-  // 👇 أضف هذه الحقول الجديدة لتتناسب مع الـ Backend
-  missingValuesFilled?: number;   // اختياري، لاستقبال القيمة من الـ Backend
-  columns?: string[];            // اختياري، قائمة بأسماء الأعمدة
+  missingValuesFilled?: number;
+  columns?: string[];
 }
 
 export interface CleaningReport {
@@ -27,8 +24,20 @@ export interface CleaningReport {
   recommendations: string[];
   columnConversions: { column: string; from: string; to: string }[];
   downloadUrl?: string;
-  // 👇 أضف هذه الحقول الجديدة لتتناسب مع الـ Backend
-  sample?: any[];      // اختياري، عينة من البيانات المنظفة
-  alerts?: string[];   // اختياري، تنبيهات من عملية التنظيف
-  summary?: string;    // اختياري، ملخص العملية
+  sample?: any[];
+  alerts?: string[];
+  summary?: string;
+}
+
+// ✅ أضف هذا التعريف الجديد
+export interface HistoryEntry {
+  id: string;
+  originalFileName: string;
+  cleanedFileName: string;
+  cleaningDate: string;
+  processingTimeMs: number;
+  qualityScore: number;
+  report: CleaningReport;
+  cleanedRows: Record<string, unknown>[];
+  columns: string[];
 }
