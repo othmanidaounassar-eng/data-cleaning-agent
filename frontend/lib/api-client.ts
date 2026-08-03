@@ -12,8 +12,7 @@ export class ApiError extends Error {
   }
 }
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 const UPLOAD_TIMEOUT_MS = 60_000;
 
@@ -38,7 +37,8 @@ export function uploadDatasetToBackend(
     const formData = new FormData();
     formData.append("file", file);
 
-    xhr.open("POST", `${API_BASE_URL}/clean`, true);
+    // ✅ تم التصحيح: استخدام API_BASE بدلاً من API_BASE_URL
+    xhr.open("POST", `${API_BASE}/clean`, true);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
 
     xhr.upload.onprogress = (event) => {
@@ -73,7 +73,8 @@ export function uploadDatasetToBackend(
       reject(
         new ApiError(
           "network",
-          `Could not reach the cleaning service at ${API_BASE_URL}. Make sure the backend is running.`
+          // ✅ تم التصحيح: استخدام API_BASE بدلاً من API_BASE_URL
+          `Could not reach the cleaning service at ${API_BASE}. Make sure the backend is running.`
         )
       );
     };
