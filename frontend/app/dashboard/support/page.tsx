@@ -27,7 +27,7 @@ export default function SupportPage() {
           {sent ? (
             <div className="flex items-center gap-2.5 rounded-xl border border-signal-good/25 bg-signal-good/[0.06] px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-signal-good" />
-              <p className="text-sm text-signal-good">Message sent — we'll get back to you soon.</p>
+              <p className="text-sm text-signal-good">Message sent — we&apos;ll get back to you soon.</p>
             </div>
           ) : (
             <form
