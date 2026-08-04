@@ -1,79 +1,37 @@
 import os
 import pandas as pd
-import tkinter as tk
-from tkinter import filedialog
 
-
-def save_cleaned_data(df):
+def save_output(df: pd.DataFrame, output_folder: str) -> str:
     """
-    Save cleaned dataset to a user-selected location.
+    Save the cleaned DataFrame to the specified output folder.
+    Supports .csv, .xlsx, and .xls formats based on file extension.
+    Defaults to .csv if no extension is specified.
     """
-
-    if df is None or df.empty:
-        print("No data available to save.")
-        return None
-
-    root = tk.Tk()
-    root.withdraw()
-
-    file_path = filedialog.asksaveasfilename(
-        title="Save Cleaned Dataset",
-        defaultextension=".csv",
-        filetypes=[
-            ("CSV File", "*.csv"),
-            ("Excel File", "*.xlsx")
-        ]
-    )
-
-    if not file_path:
-        print("Save cancelled.")
-        return None
-
-    extension = os.path.splitext(file_path)[1].lower()
-
-    try:
-        if extension == ".csv":
-            df.to_csv(file_path, index=False)
-
-        elif extension == ".xlsx":
-            df.to_excel(file_path, index=False)
-
-        else:
-            raise ValueError("Unsupported file format.")
-
-        print(f"File saved successfully:\n{file_path}")
-
-        return file_path
-
-    except Exception as error:
-        print(f"Save Error: {error}")
-        return None
-
-
-
-
-import os
-from datetime import datetime
-
-
-def save_output(df, output_folder):
-
+    # إنشاء المجلد إذا لم يكن موجوداً
     os.makedirs(output_folder, exist_ok=True)
 
-    filename = (
-        "cleaned_"
-        + datetime.now().strftime("%Y%m%d_%H%M%S")
-        + ".csv"
-    )
+    # اسم الملف الافتراضي
+    base_filename = "cleaned_data.csv"
+    file_path = os.path.join(output_folder, base_filename)
 
-    output_path = os.path.join(
-        output_folder,
-        filename
-    )
+    # إذا كان الملف موجوداً، أضف رقماً لتجنب الاستبدال
+    counter = 1
+    while os.path.exists(file_path):
+        name, ext = os.path.splitext(base_filename)
+        new_name = f"{name}_{counter}{ext}"
+        file_path = os.path.join(output_folder, new_name)
+        counter += 1
 
-    df.to_csv(
-        output_path,
-        index=False
-    )
+    # حفظ الملف حسب الامتداد
+    if file_path.endswith('.csv'):
+        df.to_csv(file_path, index=False, encoding='utf-8-sig')
+    elif file_path.endswith('.xlsx'):
+        df.to_excel(file_path, index=False, engine='openpyxl')
+    elif file_path.endswith('.xls'):
+        df.to_excel(file_path, index=False, engine='xlwt')
+    else:
+        # افتراضي: حفظ كـ CSV
+        file_path = file_path + '.csv'
+        df.to_csv(file_path, index=False, encoding='utf-8-sig')
 
-    return output_path
+    return file_path
