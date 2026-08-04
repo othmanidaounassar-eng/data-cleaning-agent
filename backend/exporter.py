@@ -1,37 +1,29 @@
 import os
+import time
 import pandas as pd
 
-def save_output(df: pd.DataFrame, output_folder: str) -> str:
+
+def save_output(df: pd.DataFrame, output_folder: str, original_filename: str = None) -> str:
     """
-    Save the cleaned DataFrame to the specified output folder.
-    Supports .csv, .xlsx, and .xls formats based on file extension.
-    Defaults to .csv if no extension is specified.
+    Save the cleaned DataFrame to a unique file in the output folder.
+    Returns the full path of the saved file.
     """
-    # إنشاء المجلد إذا لم يكن موجوداً
+    # Ensure output folder exists
     os.makedirs(output_folder, exist_ok=True)
 
-    # اسم الملف الافتراضي
-    base_filename = "cleaned_data.csv"
-    file_path = os.path.join(output_folder, base_filename)
+    # Generate a unique filename with timestamp
+    timestamp = int(time.time())
+    base_name = "cleaned_data"
+    if original_filename:
+        # Extract base name without extension
+        name_without_ext = os.path.splitext(original_filename)[0]
+        base_name = f"cleaned_{name_without_ext}"
 
-    # إذا كان الملف موجوداً، أضف رقماً لتجنب الاستبدال
-    counter = 1
-    while os.path.exists(file_path):
-        name, ext = os.path.splitext(base_filename)
-        new_name = f"{name}_{counter}{ext}"
-        file_path = os.path.join(output_folder, new_name)
-        counter += 1
+    filename = f"{base_name}_{timestamp}.csv"
+    file_path = os.path.join(output_folder, filename)
 
-    # حفظ الملف حسب الامتداد
-    if file_path.endswith('.csv'):
-        df.to_csv(file_path, index=False, encoding='utf-8-sig')
-    elif file_path.endswith('.xlsx'):
-        df.to_excel(file_path, index=False, engine='openpyxl')
-    elif file_path.endswith('.xls'):
-        df.to_excel(file_path, index=False, engine='xlwt')
-    else:
-        # افتراضي: حفظ كـ CSV
-        file_path = file_path + '.csv'
-        df.to_csv(file_path, index=False, encoding='utf-8-sig')
+    # Save as CSV (UTF-8 with BOM for Excel compatibility)
+    df.to_csv(file_path, index=False, encoding='utf-8-sig')
 
+    print(f"[SAVE] File saved at: {file_path}")  # Log the path for debugging
     return file_path

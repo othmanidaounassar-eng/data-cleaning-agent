@@ -61,5 +61,5 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "cleaning_report": cleaning_report,
     }
 
-    # ✅ التحويل إلى أنواع JSON قابلة للتسلسل
+    # Convert all values to JSON-serializable types
     return convert_to_serializable(report)

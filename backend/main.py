@@ -39,6 +39,7 @@ app.add_middleware(
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+
 # ============================================
 # نقاط النهاية (Endpoints)
 # ============================================
@@ -48,6 +49,7 @@ def home():
     return {
         "message": "AI Data Cleaning Agent is Running"
     }
+
 
 # ============================================
 # نقطة نهاية مخصصة لتحميل الملف المنظف
@@ -60,9 +62,11 @@ async def download_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(
         file_path,
-        media_type='text/csv' if filename.endswith('.csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        media_type='text/csv' if filename.endswith(
+            '.csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         filename=filename
     )
+
 
 # ============================================
 # نقطة تنظيف البيانات
@@ -82,13 +86,14 @@ async def clean_dataset(file: UploadFile = File(...)):
         before = analyze_data(df)
         cleaned_df, cleaning_report = clean_data(df)
         after = analyze_data(cleaned_df)
-        saved_file = save_output(cleaned_df, OUTPUT_FOLDER)
+
+        # Pass the original filename to create a unique cleaned file name
+        saved_file = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
         execution_time = time.time() - start_time
 
         report = generate_report(before, after, cleaning_report, execution_time)
 
         filename = os.path.basename(saved_file)
-        # Use dedicated download endpoint
         report["cleaned_file"] = f"/download/{filename}"
         report["download_url"] = f"/download/{filename}"
         report["cleaned_file_name"] = filename
@@ -99,15 +104,16 @@ async def clean_dataset(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(error))
 
+
 # ============================================
 # (اختياري) تشغيل الخادم محلياً
 # ============================================
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,
     )
-    

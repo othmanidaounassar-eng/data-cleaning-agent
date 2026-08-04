@@ -12,9 +12,12 @@ export class ApiError extends Error {
   }
 }
 
+// Use static URL directly to avoid environment issues
 const API_BASE = 'https://data-cleaning-agent-production.up.railway.app';
+// const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-const UPLOAD_TIMEOUT_MS = 300_000; // 5 دقائق
+// Increase timeout to 5 minutes (300,000 ms)
+const UPLOAD_TIMEOUT_MS = 300_000;
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
@@ -37,7 +40,6 @@ export function uploadDatasetToBackend(
     const formData = new FormData();
     formData.append("file", file);
 
-    // ✅ تم التصحيح: استخدام API_BASE بدلاً من API_BASE_URL
     xhr.open("POST", `${API_BASE}/clean`, true);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
 
@@ -73,7 +75,6 @@ export function uploadDatasetToBackend(
       reject(
         new ApiError(
           "network",
-          // ✅ تم التصحيح: استخدام API_BASE بدلاً من API_BASE_URL
           `Could not reach the cleaning service at ${API_BASE}. Make sure the backend is running.`
         )
       );
