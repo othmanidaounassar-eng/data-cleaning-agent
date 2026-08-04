@@ -15,14 +15,9 @@ from cleaner import clean_data
 from report import generate_report
 from exporter import save_output
 
-app = FastAPI(
-    title="AI Data Cleaning Agent",
-    version="1.0"
-)
+app = FastAPI(title="AI Data Cleaning Agent", version="1.0")
 
-# ============================================
-# CORS - السماح للواجهة الأمامية بالاتصال
-# ============================================
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -34,68 +29,45 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ============================================
 # إنشاء المجلدات
-# ============================================
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # ============================================
-# نقاط النهاية (Endpoints)
+# نقاط النهاية
 # ============================================
 
 @app.get("/")
 def home():
-    return {
-        "message": "AI Data Cleaning Agent is Running"
-    }
+    return {"message": "AI Data Cleaning Agent is Running"}
 
-# ============================================
-# نقطة نهاية مخصصة لتحميل الملف المنظف
-# ============================================
 @app.get("/download/{filename:path}")
 async def download_file(filename: str):
-    """
-    Download a cleaned file from the OUTPUT_FOLDER.
-    Uses :path to capture full filename including extensions.
-    """
-    # Decode URL-encoded characters (e.g., %20 -> space)
-    decoded_filename = unquote(filename)
-    # Prevent directory traversal attacks
-    safe_filename = os.path.basename(decoded_filename)
-    file_path = os.path.join(OUTPUT_FOLDER, safe_filename)
+    # فك الترميز ومنع هجمات المسار
+    decoded = unquote(filename)
+    safe = os.path.basename(decoded)
+    file_path = os.path.join(OUTPUT_FOLDER, safe)
 
     print(f"[DOWNLOAD] OUTPUT_FOLDER: {OUTPUT_FOLDER}")
-    print(f"[DOWNLOAD] Requested file: {safe_filename}")
-    print(f"[DOWNLOAD] Looking for: {file_path}")
+    print(f"[DOWNLOAD] Requested: {safe}")
+    print(f"[DOWNLOAD] Full path: {file_path}")
 
-    # Check if the file exists
     if not os.path.exists(file_path):
-        print(f"[DOWNLOAD] File not found: {file_path}")
-        # Log all files in OUTPUT_FOLDER for debugging
+        print(f"[DOWNLOAD] File not found!")
+        # سرد الملفات الموجودة للمساعدة في التشخيص
         try:
-            files_in_output = os.listdir(OUTPUT_FOLDER)
-            print(f"[DOWNLOAD] Files in OUTPUT_FOLDER: {files_in_output}")
+            files = os.listdir(OUTPUT_FOLDER)
+            print(f"[DOWNLOAD] Existing files: {files}")
         except Exception as e:
-            print(f"[DOWNLOAD] Could not list OUTPUT_FOLDER: {e}")
-        raise HTTPException(status_code=404, detail=f"File not found: {safe_filename}")
-
-    # Determine media type based on extension
-    media_type = 'text/csv'
-    if safe_filename.endswith('.xlsx'):
-        media_type = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    elif safe_filename.endswith('.xls'):
-        media_type = 'application/vnd.ms-excel'
+            print(f"[DOWNLOAD] Error listing dir: {e}")
+        raise HTTPException(status_code=404, detail=f"File not found: {safe}")
 
     return FileResponse(
         file_path,
-        media_type=media_type,
-        filename=safe_filename
+        media_type='text/csv' if safe.endswith('.csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        filename=safe
     )
 
-# ============================================
-# نقطة تنظيف البيانات
-# ============================================
 @app.post("/clean")
 async def clean_dataset(file: UploadFile = File(...)):
     start_time = time.time()
@@ -112,17 +84,15 @@ async def clean_dataset(file: UploadFile = File(...)):
         cleaned_df, cleaning_report = clean_data(df)
         after = analyze_data(cleaned_df)
 
-        # Pass the original filename to create a unique cleaned file name
         saved_file = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
         execution_time = time.time() - start_time
 
         report = generate_report(before, after, cleaning_report, execution_time)
 
         raw_filename = os.path.basename(saved_file)
-        # URL-encode the filename to safely include spaces and special characters
-        encoded_filename = quote(raw_filename)
-        report["cleaned_file"] = f"/download/{encoded_filename}"
-        report["download_url"] = f"/download/{encoded_filename}"
+        encoded = quote(raw_filename)
+        report["cleaned_file"] = f"/download/{encoded}"
+        report["download_url"] = f"/download/{encoded}"
         report["cleaned_file_name"] = raw_filename
 
         return JSONResponse(content=report)
@@ -131,15 +101,6 @@ async def clean_dataset(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(error))
 
-# ============================================
-# (اختياري) تشغيل الخادم محلياً
-# ============================================
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
