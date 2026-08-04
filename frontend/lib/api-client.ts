@@ -14,7 +14,7 @@ export class ApiError extends Error {
 
 const API_BASE = 'https://data-cleaning-agent-production.up.railway.app';
 
-const UPLOAD_TIMEOUT_MS = 60_000;
+const UPLOAD_TIMEOUT_MS = 300_000; // 5 دقائق
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
