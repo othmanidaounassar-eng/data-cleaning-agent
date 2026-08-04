@@ -24,6 +24,18 @@ app = FastAPI(
     description="API for cleaning and analyzing CSV/Excel files.",
 )
 
+@app.options("/clean")
+async def options_clean():
+    return JSONResponse(
+        content={},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "POST, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Credentials": "true",
+        }
+    )
+
 # ============================================
 # 2. إعداد CORS (السماح بالاتصال من Frontend)
 # ============================================
