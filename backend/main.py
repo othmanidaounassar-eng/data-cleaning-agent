@@ -24,6 +24,9 @@ app = FastAPI(
     description="API for cleaning and analyzing CSV/Excel files.",
 )
 
+# ============================================
+# 2. معالج OPTIONS اليدوي (لـ CORS)
+# ============================================
 @app.options("/clean")
 async def options_clean():
     return JSONResponse(
@@ -37,31 +40,24 @@ async def options_clean():
     )
 
 # ============================================
-# 2. إعداد CORS (السماح بالاتصال من Frontend)
+# 3. إعداد CORS (السماح بالاتصال من Frontend)
 # ============================================
-origins = [
-    "https://data-cleaning-agent-woad.vercel.app",  # رابط Vercel (الإنتاج)
-    "https://data-cleaning-agent-production.up.railway.app",  # رابط Railway (للاختبار)
-    "http://localhost:3000",  # التطوير المحلي
-    "http://127.0.0.1:3000",  # التطوير المحلي (بديل)
-]
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],     # السماح فقط لهذه العناوين
-    allow_credentials=True,     # السماح بإرسال الكوكيز والبيانات الحساسة
-    allow_methods=["*"],        # السماح بجميع أنواع الطلبات (GET, POST, PUT, DELETE, ...)
-    allow_headers=["*"],        # السماح بجميع الرؤوس (Headers)
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ============================================سس
-# 3. إنشاء المجلدات إذا لم تكن موجودة
+# ============================================
+# 4. إنشاء المجلدات إذا لم تكن موجودة
 # ============================================
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # ============================================
-# 4. مشاركة مجلد الملفات المنظفة (Static Files)
+# 5. مشاركة مجلد الملفات المنظفة (Static Files)
 # ============================================
 app.mount(
     "/outputs",
@@ -70,7 +66,7 @@ app.mount(
 )
 
 # ============================================
-# 5. نقاط النهاية (Endpoints)
+# 6. نقاط النهاية (Endpoints)
 # ============================================
 
 @app.get("/")
@@ -144,7 +140,7 @@ async def clean_dataset(file: UploadFile = File(...)):
         )
 
 # ============================================
-# 6. (اختياري) تشغيل الخادم للتطوير المحلي
+# 7. تشغيل الخادم للتطوير المحلي
 # ============================================
 if __name__ == "__main__":
     import uvicorn
