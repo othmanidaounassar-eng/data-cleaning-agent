@@ -1,5 +1,4 @@
 import os
-import re
 import shutil
 import time
 import traceback
@@ -66,11 +65,19 @@ async def download_file(filename: str):
     safe_filename = os.path.basename(decoded_filename)
     file_path = os.path.join(OUTPUT_FOLDER, safe_filename)
 
+    print(f"[DOWNLOAD] OUTPUT_FOLDER: {OUTPUT_FOLDER}")
     print(f"[DOWNLOAD] Requested file: {safe_filename}")
     print(f"[DOWNLOAD] Looking for: {file_path}")
 
+    # Check if the file exists
     if not os.path.exists(file_path):
         print(f"[DOWNLOAD] File not found: {file_path}")
+        # Log all files in OUTPUT_FOLDER for debugging
+        try:
+            files_in_output = os.listdir(OUTPUT_FOLDER)
+            print(f"[DOWNLOAD] Files in OUTPUT_FOLDER: {files_in_output}")
+        except Exception as e:
+            print(f"[DOWNLOAD] Could not list OUTPUT_FOLDER: {e}")
         raise HTTPException(status_code=404, detail=f"File not found: {safe_filename}")
 
     # Determine media type based on extension
@@ -135,4 +142,4 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-    )
+    )cd C:\Users\hi\Desktop\data-cleaning-agent

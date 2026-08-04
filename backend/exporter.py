@@ -6,19 +6,12 @@ import pandas as pd
 def save_output(df: pd.DataFrame, output_folder: str, original_filename: str = None) -> str:
     """
     Save the cleaned DataFrame to a unique file in the specified output folder.
-
-    Args:
-        df (pd.DataFrame): The cleaned DataFrame.
-        output_folder (str): Directory where the file will be saved.
-        original_filename (str, optional): Original uploaded filename to derive a clean base name.
-
-    Returns:
-        str: Full path of the saved file.
+    Returns the full path of the saved file.
     """
     # Ensure the output directory exists
     os.makedirs(output_folder, exist_ok=True)
 
-    # Log the output folder being used (useful for debugging path mismatches)
+    # Log the output folder being used (for debugging)
     print(f"[SAVE] Using output folder: {output_folder}")
 
     # Generate a unique filename with timestamp
@@ -35,9 +28,8 @@ def save_output(df: pd.DataFrame, output_folder: str, original_filename: str = N
     filename = f"{base_name}_{timestamp}.csv"
     file_path = os.path.join(output_folder, filename)
 
-    # Save the DataFrame as CSV with UTF-8 BOM for Excel compatibility
+    # Save as CSV with UTF-8 BOM for Excel compatibility
     df.to_csv(file_path, index=False, encoding='utf-8-sig')
 
     print(f"[SAVE] File saved at: {file_path}")
     return file_path
-

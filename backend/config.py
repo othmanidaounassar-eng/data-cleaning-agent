@@ -1,10 +1,11 @@
 import os
 
 # المجلدات
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
-OUTPUT_FOLDER = os.path.join(BASE_DIR, "outputs")
-REPORT_FOLDER = os.path.join(BASE_DIR, "reports")
+# في بيئة Railway، المسار المطلق هو /app
+# نستخدم مساراً مطلقاً لضمان التطابق
+UPLOAD_FOLDER = "/app/uploads"
+OUTPUT_FOLDER = "/app/outputs"
+REPORT_FOLDER = "/app/reports"
 
 # إنشاء المجلدات تلقائياً
 for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, REPORT_FOLDER]:
@@ -18,6 +19,3 @@ ALLOWED_EXTENSIONS = [
     ".json",
     ".parquet"
 ]
-
-
-
