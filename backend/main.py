@@ -36,13 +36,13 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,      # السماح فقط لهذه العناوين
+    allow_origins=["*"],     # السماح فقط لهذه العناوين
     allow_credentials=True,     # السماح بإرسال الكوكيز والبيانات الحساسة
     allow_methods=["*"],        # السماح بجميع أنواع الطلبات (GET, POST, PUT, DELETE, ...)
     allow_headers=["*"],        # السماح بجميع الرؤوس (Headers)
 )
 
-# ============================================
+# ============================================سس
 # 3. إنشاء المجلدات إذا لم تكن موجودة
 # ============================================
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
