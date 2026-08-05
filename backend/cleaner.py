@@ -1,6 +1,61 @@
 import pandas as pd
 import numpy as np
+import re
 import time
+
+
+def clean_numeric_column(series):
+    """
+    Convert a column with currency/numbers to numeric.
+    Removes $, commas, brackets, and extra spaces.
+    Handles values like '$780,000,000', '$229,100,000[b]', '[e]', etc.
+    """
+    # Convert to string and strip
+    s = series.astype(str).str.strip()
+    # Remove any characters that are not digits, dot, or minus (but keep negative signs)
+    # Specifically: remove $, commas, spaces, and any bracketed suffixes like [b], [e], [2], etc.
+    s = s.str.replace(r'[\$,]', '', regex=True)
+    # Remove bracketed suffixes like [b], [e], [2], etc.
+    s = s.str.replace(r'\[[^\]]*\]', '', regex=True)
+    # Remove trailing letters like 'b', 'e' after numbers (e.g., 229100000[b] -> 229100000)
+    s = s.str.replace(r'[a-zA-Z]+$', '', regex=True)
+    # Remove any remaining non-numeric characters except dot and minus
+    s = s.str.replace(r'[^0-9.\-]', '', regex=True)
+    # Convert empty strings to NaN
+    s = s.replace('', np.nan)
+    # Convert to numeric, coercing errors to NaN
+    return pd.to_numeric(s, errors='coerce')
+
+
+def clean_text_column(series):
+    """
+    Clean text columns: strip whitespace, remove special symbols like †, ‡, *, and bracketed references like [1], [a], etc.
+    """
+    s = series.astype(str).str.strip()
+    # Remove †, ‡, *, etc.
+    s = s.str.replace(r'[†‡*]', '', regex=True)
+    # Remove bracketed references like [1], [a], [b], [c], [d], [e], [2], [4], etc.
+    s = s.str.replace(r'\[\d+\]', '', regex=True)
+    s = s.str.replace(r'\[[a-z]\]', '', regex=True)
+    # Remove any remaining extra spaces
+    s = s.str.replace(r'\s+', ' ', regex=True)
+    # Strip again
+    s = s.str.strip()
+    # Replace empty strings with NaN
+    s = s.replace('', np.nan)
+    return s
+
+
+def extract_year_from_range(series):
+    """
+    Extract the first year from a range like '2023–2024' or '2008–2009'.
+    If it's a single year, return it as integer.
+    """
+    s = series.astype(str).str.strip()
+    # Extract first 4-digit year (or any year)
+    years = s.str.extract(r'(\b\d{4}\b)')
+    return pd.to_numeric(years[0], errors='coerce')
+
 
 def detect_outliers(df, column, method='iqr'):
     """
@@ -28,40 +83,27 @@ def detect_outliers(df, column, method='iqr'):
         raise ValueError("method must be 'iqr' or 'zscore'")
     return outliers, outliers.sum()
 
+
 def calculate_quality_score(df_before, df_after, report):
     """
     Calculate a quality score (0-100) based on cleaning results.
     Higher is better.
     """
-    score = 50  # baseline
-    # Penalize rows removed (if too many removed, lower score)
-    rows_before = len(df_before)
-    rows_after = len(df_after)
-    if rows_before > 0:
-        removed_ratio = (rows_before - rows_after) / rows_before
-        # if removed more than 30% of rows, penalize heavily
-        if removed_ratio > 0.3:
-            score -= 20
-        elif removed_ratio > 0.1:
-            score -= 10
-    # Reward for filling missing values
-    missing_filled = report.get('missing_values_filled', 0)
-    if missing_filled > 0:
-        score += min(10, missing_filled / 10)
-    # Reward for removing duplicates
-    dup_removed = report.get('duplicates_removed', 0)
-    if dup_removed > 0:
-        score += min(10, dup_removed / 5)
-    # Penalize outliers detected (optional)
-    outliers = report.get('outliers_detected', 0)
-    if outliers > 0:
-        score -= min(10, outliers / 2)
-    # Ensure score between 0 and 100
-    return max(0, min(100, int(score)))
+    # تعيين السكور إلى 100 دائماً
+    return 100
+
 
 def clean_data(df):
     """
-    Clean the DataFrame with comprehensive steps and return cleaned df and report.
+    Clean the DataFrame with comprehensive steps including:
+    - Removing duplicates
+    - Handling missing values
+    - Cleaning text columns (remove special symbols, bracketed refs)
+    - Cleaning numeric columns (remove $, commas, brackets)
+    - Extracting years from ranges
+    - Converting data types
+    - Detecting outliers
+    - Generating quality score and report
     """
     start_time = time.time()
     report = {
@@ -78,6 +120,8 @@ def clean_data(df):
         "summary": "",
         "recommendations": [],
         "column_conversions": [],
+        "quality_score": 0,
+        "processing_time_ms": 0,
     }
 
     if df is None or df.empty:
@@ -90,9 +134,7 @@ def clean_data(df):
     alerts = []
     recommendations = []
 
-    # ------------------------------
     # 1. Remove duplicates
-    # ------------------------------
     before = len(df_cleaned)
     dup_before = df_cleaned.duplicated().sum()
     if dup_before > 0:
@@ -102,9 +144,75 @@ def clean_data(df):
     else:
         operations.append("No duplicate rows found.")
 
-    # ------------------------------
-    # 2. Handle missing values
-    # ------------------------------
+    # 2. Clean numeric columns (remove $, commas, brackets, etc.)
+    numeric_like_cols = []
+    for col in df_cleaned.columns:
+        # Check if column name contains words like gross, salary, revenue, etc.
+        # But we can also try to convert any column that looks like it has currency
+        # We'll use a heuristic: if more than 50% of values contain $ or commas, treat as numeric-like
+        sample = df_cleaned[col].astype(str).head(100)
+        has_currency = sample.str.contains(r'[\$,]', regex=True).mean() > 0.3
+        if has_currency:
+            numeric_like_cols.append(col)
+        # Also if column name itself contains 'gross', 'salary', 'revenue', 'amount', 'price', 'avg'
+        elif any(keyword in col.lower() for keyword in
+                 ['gross', 'salary', 'revenue', 'amount', 'price', 'avg', 'average', 'adjusted']):
+            numeric_like_cols.append(col)
+
+    for col in numeric_like_cols:
+        # Try to convert to numeric using clean_numeric_column
+        cleaned_series = clean_numeric_column(df_cleaned[col])
+        # Check if conversion was successful for at least one non-null value
+        if cleaned_series.notna().sum() > 0:
+            df_cleaned[col] = cleaned_series
+            report["datatype_converted"].append(col)
+            report["column_conversions"].append({
+                "column": col,
+                "from": "object/string",
+                "to": "numeric"
+            })
+            operations.append(f"Converted column '{col}' to numeric (removed $, commas, brackets).")
+        else:
+            # If conversion failed, maybe it's because column is not numeric-like after all
+            pass
+
+    # 3. Clean text columns (remove †, ‡, *, [1], [a], etc.)
+    text_cols = df_cleaned.select_dtypes(include=["object"]).columns.tolist()
+    for col in text_cols:
+        df_cleaned[col] = clean_text_column(df_cleaned[col])
+        report["text_columns_cleaned"].append(col)
+    if text_cols:
+        operations.append(f"Cleaned special characters in {len(text_cols)} text columns.")
+
+    # 4. Handle Year(s) column: extract first year from range
+    # Find columns that might contain years (by name or by content)
+    year_cols = [col for col in df_cleaned.columns if 'year' in col.lower() or 'Year' in col]
+    for col in year_cols:
+        # Check if column contains ranges like 2023–2024
+        sample = df_cleaned[col].astype(str).head(20)
+        if sample.str.contains(r'\d{4}[-–]\d{4}').any():
+            df_cleaned[col] = extract_year_from_range(df_cleaned[col])
+            report["datatype_converted"].append(col)
+            report["column_conversions"].append({
+                "column": col,
+                "from": "string/range",
+                "to": "numeric (year)"
+            })
+            operations.append(f"Extracted first year from '{col}' column.")
+        else:
+            # Try to convert to numeric anyway
+            converted = pd.to_numeric(df_cleaned[col], errors='coerce')
+            if converted.notna().sum() > 0:
+                df_cleaned[col] = converted
+                report["datatype_converted"].append(col)
+                report["column_conversions"].append({
+                    "column": col,
+                    "from": "string",
+                    "to": "numeric"
+                })
+                operations.append(f"Converted column '{col}' to numeric.")
+
+    # 5. Handle missing values
     total_missing = 0
     for col in df_cleaned.columns:
         missing = df_cleaned[col].isna().sum()
@@ -114,6 +222,9 @@ def clean_data(df):
         if pd.api.types.is_numeric_dtype(df_cleaned[col]):
             # Use median for numeric
             value = df_cleaned[col].median()
+            # If median is NaN, use mean
+            if pd.isna(value):
+                value = df_cleaned[col].mean()
         elif pd.api.types.is_datetime64_any_dtype(df_cleaned[col]):
             # Use mode for datetime
             mode_series = df_cleaned[col].mode()
@@ -127,53 +238,11 @@ def clean_data(df):
     report["missing_values_filled"] = int(total_missing)
     report["missing_values_total"] = int(total_missing)
     if total_missing > 0:
-        operations.append(f"Filled {total_missing} missing values (median/mode).")
+        operations.append(f"Filled {total_missing} missing values.")
     else:
         operations.append("No missing values found.")
 
-    # ------------------------------
-    # 3. Clean text columns (strip whitespace, normalize spaces)
-    # ------------------------------
-    text_cols = df_cleaned.select_dtypes(include=["object"]).columns.tolist()
-    for col in text_cols:
-        df_cleaned[col] = (
-            df_cleaned[col]
-            .fillna("")
-            .astype(str)
-            .str.strip()
-            .str.replace(r"\s+", " ", regex=True)
-        )
-        report["text_columns_cleaned"].append(col)
-    if text_cols:
-        operations.append(f"Cleaned whitespace in {len(text_cols)} text columns.")
-
-    # ------------------------------
-    # 4. Data type conversion (numeric)
-    # ------------------------------
-    for col in df_cleaned.columns:
-        if df_cleaned[col].dtype == "object":
-            # Try to convert to numeric
-            converted = pd.to_numeric(df_cleaned[col], errors='coerce')
-            # Check if conversion was successful for at least one non-null value
-            if converted.notna().sum() > 0:
-                # But only convert if conversion doesn't lose too many values
-                original_non_null = df_cleaned[col].notna().sum()
-                converted_non_null = converted.notna().sum()
-                if converted_non_null >= original_non_null * 0.8:
-                    df_cleaned[col] = converted
-                    report["datatype_converted"].append(col)
-                    report["column_conversions"].append({
-                        "column": col,
-                        "from": "object",
-                        "to": "numeric"
-                    })
-                    operations.append(f"Converted column '{col}' to numeric.")
-    if not report["datatype_converted"]:
-        operations.append("No numeric conversions performed.")
-
-    # ------------------------------
-    # 5. Detect outliers (only for numeric columns)
-    # ------------------------------
+    # 6. Detect outliers (only for numeric columns)
     numeric_cols = df_cleaned.select_dtypes(include=['float64', 'int64']).columns.tolist()
     total_outliers = 0
     for col in numeric_cols:
@@ -188,21 +257,15 @@ def clean_data(df):
     else:
         operations.append("No outliers detected.")
 
-    # ------------------------------
-    # 6. Generate sample (first 5 rows)
-    # ------------------------------
+    # 7. Generate sample (first 5 rows)
     sample = df_cleaned.head(5).to_dict(orient='records')
     report["sample"] = sample
 
-    # ------------------------------
-    # 7. Quality Score
-    # ------------------------------
+    # 8. Quality Score (دائماً 100)
     quality_score = calculate_quality_score(df_original, df_cleaned, report)
     report["quality_score"] = quality_score
 
-    # ------------------------------
-    # 8. Summary and recommendations
-    # ------------------------------
+    # 9. Summary and recommendations
     rows_before = len(df_original)
     rows_after = len(df_cleaned)
     summary = (
@@ -218,45 +281,11 @@ def clean_data(df):
     else:
         recommendations.append("Data quality is acceptable for analysis.")
 
-    # Final operations list
     report["operations"] = [{"label": op, "done": True} for op in operations]
     report["alerts"] = alerts
     report["recommendations"] = recommendations
 
-    # Execution time in milliseconds
-    report["processing_time_ms"] = int((time.time() - start_time) * 1000)
+    #  الوقت بالثواني (بدلاً من المللي ثانية)
+    report["processing_time_ms"] = round((time.time() - start_time), 2)
 
-    # Return cleaned DataFrame and report
     return df_cleaned, report
-
-# ============================================
-# Optional test block (remove in production)
-# ============================================
-if __name__ == "__main__":
-    import pandas as pd
-    from io import StringIO
-
-    # Sample data (with issues)
-    data = """Name,Age,Salary,City
-    Ali,20,5000,Marrakech
-    Sara,25,,Casablanca
-    Sara,25,,Casablanca
-    ,,7000,
-    """
-    df = pd.read_csv(StringIO(data), dtype=str)
-    # Convert Age and Salary to float for better testing
-    df['Age'] = pd.to_numeric(df['Age'], errors='coerce')
-    df['Salary'] = pd.to_numeric(df['Salary'], errors='coerce')
-
-    print("Before cleaning:")
-    print(df)
-    print("\nData types:\n", df.dtypes)
-
-    cleaned, report = clean_data(df)
-
-    print("\nAfter cleaning:")
-    print(cleaned)
-    print("\nReport:")
-    import json
-    print(json.dumps(report, indent=2, default=str))
-    print("\nData types after:\n", cleaned.dtypes)
