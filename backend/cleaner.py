@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import re
 import time
+import math  #  تمت الإضافة
 
 
 def clean_numeric_column(series):
@@ -261,13 +262,18 @@ def clean_data(df):
     sample = df_cleaned.head(5).to_dict(orient='records')
     report["sample"] = sample
 
-    # 8. Quality Score (دائماً 100)
+    # 8. Quality Score (دائماً 100) - مع التحقق من inf
     quality_score = calculate_quality_score(df_original, df_cleaned, report)
+    #  التأكد من أن القيمة ليست inf أو -inf
+    if not math.isfinite(quality_score):
+        quality_score = 0
     report["quality_score"] = quality_score
 
     # 9. Summary and recommendations
     rows_before = len(df_original)
     rows_after = len(df_cleaned)
+    # التأكد من أن النسب المئوية لا تنتج inf (تجنب القسمة على صفر)
+    removed_ratio = (rows_before - rows_after) / rows_before if rows_before > 0 else 0
     summary = (
         f"Cleaned {rows_before} rows. Removed {report['duplicates_removed']} duplicates, "
         f"filled {report['missing_values_filled']} missing values, "
