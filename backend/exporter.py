@@ -20,3 +20,13 @@ def save_output(df: pd.DataFrame, output_folder: str, original_filename: str = N
     df.to_csv(file_path, index=False, encoding='utf-8-sig')
     print(f"[SAVE] File saved at: {file_path}")
     return file_path
+
+
+import io
+
+def save_output_to_bytes(df: pd.DataFrame) -> bytes:
+    """Convert DataFrame to CSV bytes without saving to disk."""
+    buffer = io.BytesIO()
+    df.to_csv(buffer, index=False, encoding='utf-8-sig')
+    buffer.seek(0)
+    return buffer.getvalue()

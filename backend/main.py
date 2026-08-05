@@ -2,9 +2,10 @@ import os
 import shutil
 import time
 import traceback
+import uuid
 from urllib.parse import quote, unquote
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 
@@ -13,7 +14,7 @@ from reader import read_data
 from analyzer import analyze_data
 from cleaner import clean_data
 from report import generate_report
-from exporter import save_output
+from exporter import save_output, save_output_to_bytes
 
 app = FastAPI(title="AI Data Cleaning Agent", version="1.0")
 
@@ -29,9 +30,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# إنشاء المجلدات
+# إنشاء المجلدات (للملفات المؤقتة فقط)
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+
+# تخزين مؤقت للملفات المنظفة (في الذاكرة)
+downloaded_files = {}
 
 # ============================================
 # نقاط النهاية
@@ -41,31 +45,15 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 def home():
     return {"message": "AI Data Cleaning Agent is Running"}
 
-@app.get("/download/{filename:path}")
-async def download_file(filename: str):
-    # فك الترميز ومنع هجمات المسار
-    decoded = unquote(filename)
-    safe = os.path.basename(decoded)
-    file_path = os.path.join(OUTPUT_FOLDER, safe)
-
-    print(f"[DOWNLOAD] OUTPUT_FOLDER: {OUTPUT_FOLDER}")
-    print(f"[DOWNLOAD] Requested: {safe}")
-    print(f"[DOWNLOAD] Full path: {file_path}")
-
-    if not os.path.exists(file_path):
-        print(f"[DOWNLOAD] File not found!")
-        # سرد الملفات الموجودة للمساعدة في التشخيص
-        try:
-            files = os.listdir(OUTPUT_FOLDER)
-            print(f"[DOWNLOAD] Existing files: {files}")
-        except Exception as e:
-            print(f"[DOWNLOAD] Error listing dir: {e}")
-        raise HTTPException(status_code=404, detail=f"File not found: {safe}")
-
-    return FileResponse(
-        file_path,
-        media_type='text/csv' if safe.endswith('.csv') else 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        filename=safe
+@app.get("/download/{file_id}")
+async def download_file(file_id: str):
+    """Serve cleaned file from memory using file_id."""
+    if file_id not in downloaded_files:
+        raise HTTPException(status_code=404, detail="File not found or expired")
+    return Response(
+        content=downloaded_files[file_id],
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=cleaned_data.csv"}
     )
 
 @app.post("/clean")
@@ -84,16 +72,17 @@ async def clean_dataset(file: UploadFile = File(...)):
         cleaned_df, cleaning_report = clean_data(df)
         after = analyze_data(cleaned_df)
 
-        saved_file = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
-        execution_time = time.time() - start_time
+        # حفظ الملف في الذاكرة بدلاً من القرص
+        csv_bytes = save_output_to_bytes(cleaned_df)
+        file_id = str(uuid.uuid4())
+        downloaded_files[file_id] = csv_bytes
 
+        execution_time = time.time() - start_time
         report = generate_report(before, after, cleaning_report, execution_time)
 
-        raw_filename = os.path.basename(saved_file)
-        encoded = quote(raw_filename)
-        report["cleaned_file"] = f"/download/{encoded}"
-        report["download_url"] = f"/download/{encoded}"
-        report["cleaned_file_name"] = raw_filename
+        # إضافة رابط التحميل الجديد
+        report["download_url"] = f"/download/{file_id}"
+        report["cleaned_file_name"] = "cleaned_data.csv"
 
         return JSONResponse(content=report)
 
