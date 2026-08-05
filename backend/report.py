@@ -39,6 +39,10 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
     duplicates_removed = cleaning_report.get("duplicates_removed", 0)
     missing_values_filled = cleaning_report.get("missing_values_filled", 0)
 
+    # Extract new fields from cleaning_report
+    quality_score = cleaning_report.get("quality_score", 0)
+    processing_time_ms = cleaning_report.get("processing_time_ms", 0)
+
     report = {
         "rows_before": rows_before,
         "rows_after": rows_after,
@@ -47,6 +51,8 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "duplicates_removed": duplicates_removed,
         "missing_values_filled": missing_values_filled,
         "execution_time": execution_time,
+        "quality_score": quality_score,
+        "processing_time_ms": processing_time_ms,
         "sample": cleaning_report.get("sample", []),
         "alerts": cleaning_report.get("alerts", []),
         "summary": cleaning_report.get(
