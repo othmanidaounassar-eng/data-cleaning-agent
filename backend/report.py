@@ -7,17 +7,23 @@ def convert_to_serializable(obj):
     Convert numpy/pandas types to Python native types for JSON serialization.
     Handles inf, -inf, and NaN by converting them to None.
     """
-    if isinstance(obj, (np.integer, np.int64, np.int32)):
+    # Handle basic Python float with inf/nan
+    if isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    # Handle numpy numeric types
+    elif isinstance(obj, (np.integer, np.int64, np.int32)):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float64, np.float32)):
-        # Convert inf, -inf, and NaN to None
         if math.isnan(obj) or math.isinf(obj):
             return None
         return float(obj)
+    # Handle arrays and sequences
     elif isinstance(obj, np.ndarray):
-        return obj.tolist()
+        return [convert_to_serializable(item) for item in obj]
     elif isinstance(obj, pd.Series):
-        return obj.to_list()
+        return [convert_to_serializable(item) for item in obj.to_list()]
     elif isinstance(obj, pd.DataFrame):
         return obj.to_dict(orient='records')
     elif isinstance(obj, dict):
@@ -39,9 +45,9 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
     duplicates_removed = cleaning_report.get("duplicates_removed", 0)
     missing_values_filled = cleaning_report.get("missing_values_filled", 0)
 
-    # Extract new fields from cleaning_report
     quality_score = cleaning_report.get("quality_score", 0)
-    processing_time_ms = cleaning_report.get("processing_time_ms", 0)
+    # ✅ استخدم execution_time بدلاً من processing_time_ms من cleaner.py
+    processing_time_ms = int(execution_time * 1000)
 
     report = {
         "rows_before": rows_before,
@@ -52,7 +58,7 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "missing_values_filled": missing_values_filled,
         "execution_time": execution_time,
         "quality_score": quality_score,
-        "processing_time_ms": processing_time_ms,
+        "processing_time_ms": processing_time_ms,  # ✅ الآن أصبحت محسوبة بشكل صحيح
         "sample": cleaning_report.get("sample", []),
         "alerts": cleaning_report.get("alerts", []),
         "summary": cleaning_report.get(
@@ -67,5 +73,5 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "cleaning_report": cleaning_report,
     }
 
-    # Convert all values to JSON-serializable types
+    # Convert all values to JSON-serializable types (including inf → None)
     return convert_to_serializable(report)
