@@ -1,32 +1,24 @@
 import os
 import time
-import re
-import pandas as pd
+import base64
+from io import StringIO
 
-def save_output(df: pd.DataFrame, output_folder: str, original_filename: str = None) -> str:
+
+def df_to_csv_text(df):
+    buffer = StringIO()
+    df.to_csv(buffer, index=False)
+    return "\ufeff" + buffer.getvalue()
+
+
+def dataframe_to_base64(df) -> str:
+    csv_text = df_to_csv_text(df)
+    return base64.b64encode(csv_text.encode("utf-8")).decode("ascii")
+
+
+def save_output(df, output_folder, original_filename=None):
     os.makedirs(output_folder, exist_ok=True)
-    print(f"[SAVE] Using output folder: {output_folder}")
-
     timestamp = int(time.time())
-    base_name = "cleaned_data"
-    if original_filename:
-        name_without_ext = os.path.splitext(original_filename)[0]
-        clean_name = re.sub(r'[^\w\-]', '_', name_without_ext)
-        clean_name = re.sub(r'_+', '_', clean_name)
-        base_name = f"cleaned_{clean_name}"
-
-    filename = f"{base_name}_{timestamp}.csv"
+    filename = f"cleaned_{timestamp}.csv"
     file_path = os.path.join(output_folder, filename)
-    df.to_csv(file_path, index=False, encoding='utf-8-sig')
-    print(f"[SAVE] File saved at: {file_path}")
+    df.to_csv(file_path, index=False, encoding="utf-8-sig")
     return file_path
-
-
-import io
-
-def save_output_to_bytes(df: pd.DataFrame) -> bytes:
-    """Convert DataFrame to CSV bytes without saving to disk."""
-    buffer = io.BytesIO()
-    df.to_csv(buffer, index=False, encoding='utf-8-sig')
-    buffer.seek(0)
-    return buffer.getvalue()

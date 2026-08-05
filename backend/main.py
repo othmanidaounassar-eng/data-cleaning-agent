@@ -1,95 +1,69 @@
-import os
-import shutil
 import time
-import traceback
-import uuid
-from urllib.parse import quote, unquote
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Response
+import pandas as pd
+from io import BytesIO
+
+from fastapi import FastAPI, UploadFile, File
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
 
-from config import UPLOAD_FOLDER, OUTPUT_FOLDER
-from reader import read_data
-from analyzer import analyze_data
-from cleaner import clean_data
-from report import generate_report
-from exporter import save_output, save_output_to_bytes
+from config import OUTPUT_FOLDER
+from exporter import save_output, dataframe_to_base64
 
-app = FastAPI(title="AI Data Cleaning Agent", version="1.0")
+app = FastAPI()
 
-# CORS
+# ضروري إذا كان الفرونت (Vercel) على دومين مختلف عن الباك (Railway)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://data-cleaning-agent-woad.vercel.app",
-        "https://data-cleaning-agent-production.up.railway.app",
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# إنشاء المجلدات (للملفات المؤقتة فقط)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# تخزين مؤقت للملفات المنظفة (في الذاكرة)
-downloaded_files = {}
+def read_csv(uploaded: bytes) -> pd.DataFrame:
+    """قراءة الملف المرفوع مع كشف الترميز (UTF-8 ثم fallback)."""
+    try:
+        text = uploaded.decode("utf-8")
+    except UnicodeDecodeError:
+        text = uploaded.decode("latin-1")
+    return pd.read_csv(BytesIO(text.encode("utf-8")))
 
-# ============================================
-# نقاط النهاية
-# ============================================
 
-@app.get("/")
-def home():
-    return {"message": "AI Data Cleaning Agent is Running"}
+def clean_logic(df: pd.DataFrame) -> pd.DataFrame:
+    """مثال بسيط للتنظيف — استبدله بمنطق التنظيف الحقيقي لديك."""
+    df = df.copy()
+    for col in df.select_dtypes(include=["object"]).columns:
+        df[col] = df[col].astype(str).str.strip()
+    df = df.replace("", pd.NA).dropna(how="all")   # إزالة الصفوف الفارغة كلياً
+    df = df.drop_duplicates().reset_index(drop=True)
+    return df
 
-@app.get("/download/{file_id}")
-async def download_file(file_id: str):
-    """Serve cleaned file from memory using file_id."""
-    if file_id not in downloaded_files:
-        raise HTTPException(status_code=404, detail="File not found or expired")
-    return Response(
-        content=downloaded_files[file_id],
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=cleaned_data.csv"}
-    )
 
 @app.post("/clean")
 async def clean_dataset(file: UploadFile = File(...)):
-    start_time = time.time()
-    try:
-        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-        os.makedirs(OUTPUT_FOLDER, exist_ok=True)
+    raw = await file.read()
+    df = read_csv(raw)
 
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+    cleaned_df = clean_logic(df)
 
-        df = read_data(file_path)
-        before = analyze_data(df)
-        cleaned_df, cleaning_report = clean_data(df)
-        after = analyze_data(cleaned_df)
+    # حفظ اختياري على القرص (لا يُستخدم في التحميل إطلاقاً)
+    save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
 
-        # حفظ الملف في الذاكرة بدلاً من القرص
-        csv_bytes = save_output_to_bytes(cleaned_df)
-        file_id = str(uuid.uuid4())
-        downloaded_files[file_id] = csv_bytes
+    report = {
+        "status": "success",
+        "original_filename": file.filename,
+        "rows_before": int(len(df)),
+        "rows_after": int(len(cleaned_df)),
+        "rows_removed": int(len(df) - len(cleaned_df)),
+    }
 
-        execution_time = time.time() - start_time
-        report = generate_report(before, after, cleaning_report, execution_time)
-
-        # إضافة رابط التحميل الجديد
-        report["download_url"] = f"/download/{file_id}"
-        report["cleaned_file_name"] = "cleaned_data.csv"
-
-        return JSONResponse(content=report)
-
-    except Exception as error:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(error))
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    # الحل الجذري: الملف كامل داخل جسم الاستجابة — لا 404 ممكن
+    return JSONResponse(content={
+        "report": report,
+        "download": {
+            "filename": f"cleaned_{int(time.time())}.csv",
+            "media_type": "text/csv",
+            "content": dataframe_to_base64(cleaned_df),
+        },
+    })

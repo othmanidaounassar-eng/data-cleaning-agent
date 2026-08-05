@@ -1,112 +1,63 @@
-export type ApiErrorKind = "network" | "timeout" | "server" | "parse" | "aborted";
-
-export class ApiError extends Error {
-  kind: ApiErrorKind;
-  status?: number;
-
-  constructor(kind: ApiErrorKind, message: string, status?: number) {
-    super(message);
-    this.name = "ApiError";
-    this.kind = kind;
-    this.status = status;
-  }
+export interface CleanReport {
+  status: string;
+  original_filename: string;
+  rows_before: number;
+  rows_after: number;
+  rows_removed: number;
 }
 
-// Use static URL directly to avoid environment issues
-const API_BASE = 'https://data-cleaning-agent-production.up.railway.app';
-// const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-// Increase timeout to 5 minutes (300,000 ms)
-const UPLOAD_TIMEOUT_MS = 300_000;
-
-export interface UploadOptions {
-  onProgress?: (percent: number) => void;
-  signal?: AbortSignal;
+export interface DownloadPayload {
+  filename: string;
+  media_type: string;
+  content: string; // base64
 }
 
-/**
- * POSTs a dataset to the FastAPI backend's `/clean` endpoint as
- * multipart/form-data and resolves with the parsed JSON report.
- *
- * Uses XMLHttpRequest instead of fetch so we can report real upload
- * progress, which fetch does not support natively.
- */
-export function uploadDatasetToBackend(
-  file: File,
-  { onProgress, signal }: UploadOptions = {}
-): Promise<Record<string, unknown>> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("file", file);
+export interface CleanResponse {
+  report: CleanReport;
+  download: DownloadPayload;
+}
 
-    xhr.open("POST", `${API_BASE}/clean`, true);
-    xhr.timeout = UPLOAD_TIMEOUT_MS;
+export const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        onProgress?.(Math.round((event.loaded / event.total) * 100));
-      }
-    };
+export async function cleanCsv(file: File): Promise<CleanResponse> {
+  const formData = new FormData();
+  formData.append("file", file);
 
-    xhr.onload = () => {
-      const isSuccess = xhr.status >= 200 && xhr.status < 300;
-
-      if (!isSuccess) {
-        let message = `The cleaning service returned an error (status ${xhr.status}).`;
-        try {
-          const body = JSON.parse(xhr.responseText);
-          if (typeof body?.detail === "string") message = body.detail;
-        } catch {
-          // response wasn't JSON — keep the default message
-        }
-        reject(new ApiError("server", message, xhr.status));
-        return;
-      }
-
-      try {
-        resolve(JSON.parse(xhr.responseText));
-      } catch {
-        reject(new ApiError("parse", "The server response could not be read as JSON."));
-      }
-    };
-
-    xhr.onerror = () => {
-      reject(
-        new ApiError(
-          "network",
-          `Could not reach the cleaning service at ${API_BASE}. Make sure the backend is running.`
-        )
-      );
-    };
-
-    xhr.ontimeout = () => {
-      reject(new ApiError("timeout", "The backend took too long to respond. Try a smaller file."));
-    };
-
-    xhr.onabort = () => {
-      reject(new ApiError("aborted", "Upload cancelled."));
-    };
-
-    signal?.addEventListener("abort", () => xhr.abort());
-
-    xhr.send(formData);
+  const res = await fetch(`${API_BASE_URL}/clean`, {
+    method: "POST",
+    body: formData,
   });
+
+  if (!res.ok) {
+    throw new Error(`Clean request failed: ${res.status} ${res.statusText}`);
+  }
+
+  return res.json();
 }
 
-export function apiErrorTitle(kind: ApiErrorKind): string {
-  switch (kind) {
-    case "network":
-      return "Can't Reach the Cleaning Service";
-    case "timeout":
-      return "Request Timed Out";
-    case "server":
-      return "Backend Error";
-    case "parse":
-      return "Unexpected Response";
-    case "aborted":
-      return "Upload Cancelled";
-    default:
-      return "Something Went Wrong";
+export function downloadCleanedFile(payload: DownloadPayload): void {
+  const binary = atob(payload.content);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
   }
+  const blob = new Blob([bytes], {
+    type: payload.media_type || "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = payload.filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// استخدام مباشر من أي صفحة
+export async function handleCleanAndDownload(file: File): Promise<CleanReport> {
+  const data = await cleanCsv(file);
+  downloadCleanedFile(data.download);
+  return data.report;
 }
