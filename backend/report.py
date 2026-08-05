@@ -1,18 +1,18 @@
-"""
-Report Generation Module
-This module handles the creation of comprehensive reports from the cleaning process.
-"""
-
+import math
 import numpy as np
 import pandas as pd
 
 def convert_to_serializable(obj):
     """
     Convert numpy/pandas types to Python native types for JSON serialization.
+    Handles inf, -inf, and NaN by converting them to None.
     """
     if isinstance(obj, (np.integer, np.int64, np.int32)):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float64, np.float32)):
+        # Convert inf, -inf, and NaN to None
+        if math.isnan(obj) or math.isinf(obj):
+            return None
         return float(obj)
     elif isinstance(obj, np.ndarray):
         return obj.tolist()
