@@ -1,28 +1,44 @@
+import os
+import shutil
 import time
+import traceback
 import base64
-import pandas as pd
 from io import BytesIO
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from urllib.parse import quote, unquote
 
-from config import OUTPUT_FOLDER
-from exporter import save_output
+import pandas as pd
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse, Response
+
+# استيراد الدوال من ملفات المشروع
+from config import UPLOAD_FOLDER, OUTPUT_FOLDER
+from reader import read_data
 from analyzer import analyze_data
 from cleaner import clean_data
 from report import generate_report
+from exporter import save_output
 
 # ============================================
-# 1. إنشاء التطبيق مع CORS محسّن
+# 1. إنشاء تطبيق FastAPI
 # ============================================
-app = FastAPI(title="AI Data Cleaning Agent", version="1.0")
+app = FastAPI(
+    title="AI Data Cleaning Agent",
+    version="1.0",
+    description="API for cleaning and analyzing CSV/Excel files.",
+)
 
+# ============================================
+# 2. إعدادات CORS
+# ============================================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "https://data-cleaning-agent-woad.vercel.app",
         "https://data-cleaning-agent-production.up.railway.app",
-        "http://localhost:3000",  # للتطوير المحلي
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -30,73 +46,83 @@ app.add_middleware(
 )
 
 # ============================================
-# 2. دوال مساعدة
+# 3. إنشاء المجلدات
 # ============================================
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+# ============================================
+# 4. دالة تحويل DataFrame إلى Base64
+# ============================================
 def dataframe_to_base64(df: pd.DataFrame) -> str:
-    """تحويل DataFrame إلى CSV مشفر بـ Base64."""
+    """Convert DataFrame to base64 encoded CSV."""
     buffer = BytesIO()
     df.to_csv(buffer, index=False, encoding='utf-8-sig')
     buffer.seek(0)
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 # ============================================
-# 3. نقطة التنظيف الرئيسية
+# 5. نقاط النهاية (Endpoints)
 # ============================================
+
+@app.get("/")
+def home():
+    """Health check endpoint."""
+    return {
+        "message": "AI Data Cleaning Agent is Running",
+        "status": "healthy",
+        "version": "1.0"
+    }
 
 @app.post("/clean")
 async def clean_dataset(file: UploadFile = File(...)):
+    """
+    Clean uploaded CSV or Excel file and return report with download link.
+    """
     start_time = time.time()
     try:
-        # قراءة الملف (مع دعم ترميزات مختلفة)
-        raw = await file.read()
-        try:
-            text = raw.decode("utf-8")
-        except UnicodeDecodeError:
-            text = raw.decode("latin-1")
-        df = pd.read_csv(BytesIO(text.encode("utf-8")))
+        # حفظ الملف المؤقت
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
 
-        # تحليل البيانات قبل التنظيف
+        # قراءة الملف (يدعم CSV و Excel)
+        df = read_data(file_path)
+
+        # تحليل قبل التنظيف
         before = analyze_data(df)
 
-        # تنظيف البيانات (يُعيد DataFrame + تقرير التنظيف)
+        # تنظيف البيانات
         cleaned_df, cleaning_report = clean_data(df)
 
-        # تحليل البيانات بعد التنظيف
+        # تحليل بعد التنظيف
         after = analyze_data(cleaned_df)
 
         # حساب وقت التنفيذ
         execution_time = time.time() - start_time
 
-        # إنشاء التقرير النهائي (يحتوي على جميع الإحصائيات)
+        # إنشاء التقرير
         report = generate_report(before, after, cleaning_report, execution_time)
 
-        # تحويل الملف المنظف إلى Base64 للتحميل المباشر
+        # إضافة رابط التحميل (Base64)
         encoded_csv = dataframe_to_base64(cleaned_df)
         report["download_url"] = f"data:text/csv;base64,{encoded_csv}"
         report["cleaned_file_name"] = f"cleaned_{int(time.time())}.csv"
 
-        # (اختياري) حفظ الملف على القرص – ليس ضروريًا للتحميل
-        # save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
-
         return JSONResponse(content=report)
 
     except Exception as error:
-        import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(error)}")
 
 # ============================================
-# 4. نقطة صحية (Health Check)
-# ============================================
-
-@app.get("/")
-def home():
-    return {"message": "AI Data Cleaning Agent is Running", "status": "healthy"}
-
-# ============================================
-# 5. تشغيل الخادم محلياً (اختياري)
+# 6. تشغيل الخادم محلياً
 # ============================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+    )
