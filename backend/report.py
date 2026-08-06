@@ -46,8 +46,8 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
     missing_values_filled = cleaning_report.get("missing_values_filled", 0)
 
     quality_score = cleaning_report.get("quality_score", 0)
-    # ✅ استخدم execution_time بدلاً من processing_time_ms من cleaner.py
-    processing_time_ms = int(execution_time * 1000)
+    # ✅ الوقت بالثواني (بدلاً من المللي ثانية)
+    processing_time_s = round(execution_time, 2)
 
     report = {
         "rows_before": rows_before,
@@ -58,7 +58,7 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "missing_values_filled": missing_values_filled,
         "execution_time": execution_time,
         "quality_score": quality_score,
-        "processing_time_ms": processing_time_ms,  # ✅ الآن أصبحت محسوبة بشكل صحيح
+        "processing_time_s": processing_time_s,  # ✅ الوقت بالثواني
         "sample": cleaning_report.get("sample", []),
         "alerts": cleaning_report.get("alerts", []),
         "summary": cleaning_report.get(

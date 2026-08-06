@@ -80,10 +80,11 @@ export interface CleaningReport {
   recommendations: string[];
   columnConversions: { column: string; from: string; to: string }[];
   downloadUrl?: string;
-  // 👇 حقول إضافية من Backend (اختيارية)
   sample?: any[];
   alerts?: string[];
   summary?: string;
+  // ✅ الوقت بالثواني
+  processing_time_s?: number;
 }
 
 export interface HistoryEntry {

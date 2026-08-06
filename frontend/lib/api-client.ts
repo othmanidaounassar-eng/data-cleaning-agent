@@ -16,8 +16,8 @@ export class ApiError extends Error {
 const API_BASE = 'https://data-cleaning-agent-production.up.railway.app';
 // const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
-// Increase timeout to 5 minutes (300,000 ms)
-const UPLOAD_TIMEOUT_MS = 300_000;
+// ✅ زيادة المهلة إلى 15 دقيقة (900,000 مللي ثانية)
+const UPLOAD_TIMEOUT_MS = 900_000;
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;

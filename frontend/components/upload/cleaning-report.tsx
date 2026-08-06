@@ -2,7 +2,7 @@ import { CheckCircle2, Circle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CleaningReport } from "@/lib/types";
-import { formatDuration, cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"; // ✅ تم إزالة formatDuration غير المستخدم
 
 export function CleaningResultStats({ report }: { report: CleaningReport }) {
   const s = report.stats;
@@ -13,7 +13,11 @@ export function CleaningResultStats({ report }: { report: CleaningReport }) {
     { label: "Missing Values Fixed", value: s.missingValuesFixed.toLocaleString() },
     { label: "Outliers Detected", value: s.outliersDetected.toLocaleString() },
     { label: "Columns Converted", value: s.columnsConverted.toLocaleString() },
-    { label: "Cleaning Time", value: formatDuration(s.processingTimeMs) },
+    // ✅ عرض الوقت بالثواني
+    {
+      label: "Cleaning Time",
+      value: report.processing_time_s !== undefined ? `${report.processing_time_s} s` : "—",
+    },
   ];
 
   return (
