@@ -65,7 +65,6 @@ export interface CleaningStats {
   charactersCleaned: number;
   processingTimeMs: number;
   qualityScore: number;
-  // 👇 حقول إضافية من Backend (اختيارية)
   missingValuesFilled?: number;
   columns?: string[];
 }
@@ -83,8 +82,10 @@ export interface CleaningReport {
   sample?: any[];
   alerts?: string[];
   summary?: string;
-  // ✅ الوقت بالثواني
   processing_time_s?: number;
+  // ✅ حقول جديدة من Backend
+  download_url?: string;          // رابط التحميل (Base64)
+  cleaned_file_name?: string;     // اسم الملف المنظف
 }
 
 export interface HistoryEntry {
