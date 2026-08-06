@@ -19,6 +19,7 @@ export function saveHistory(history: HistoryEntry[]) {
   try {
     // الاحتفاظ بآخر MAX_HISTORY_ITEMS فقط
     const trimmed = history.slice(0, MAX_HISTORY_ITEMS);
+
     // تنظيف البيانات من الحقول الكبيرة قبل التخزين
     const dataToStore = trimmed.map((entry) => ({
       ...entry,
@@ -29,6 +30,7 @@ export function saveHistory(history: HistoryEntry[]) {
         // احتفظ فقط بالبيانات الأساسية
       },
     }));
+
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
   } catch (error) {
     // إذا فشل التخزين (QuotaExceededError)، احذف نصف العناصر وحاول مرة أخرى
