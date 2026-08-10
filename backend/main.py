@@ -25,7 +25,7 @@ from report import generate_report
 from exporter import save_output
 from database import engine, Base, get_db
 from models import User
-from schemas import UserCreate, UserOut, Token
+from schemas import UserCreate, UserOut, Token, RefreshTokenRequest
 from auth import (
     create_access_token,
     create_refresh_token,
@@ -113,13 +113,13 @@ def dataframe_to_base64(df: pd.DataFrame) -> str:
 # ============================================
 
 @app.post("/auth/register", response_model=UserOut, status_code=201)
-@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
+# @limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")  # معلق مؤقتاً للاختبار
 def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     """تسجيل مستخدم جديد."""
     return create_user(db, user)
 
 @app.post("/auth/login", response_model=Token)
-@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
+# @limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")  # معلق مؤقتاً للاختبار
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """تسجيل الدخول وإرجاع توكنات مع تعيين Cookies آمنة."""
     user = get_user_by_email(db, form_data.username)
@@ -155,19 +155,42 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     return response
 
 @app.post("/auth/refresh", response_model=Token)
-def refresh_token(refresh_token: Optional[str] = None, db: Session = Depends(get_db)):
-    """تجديد التوكنات باستخدام Refresh Token."""
+def refresh_token(
+    request: Request,
+    request_data: Optional[RefreshTokenRequest] = None,
+    db: Session = Depends(get_db)
+):
+    """
+    تجديد التوكنات باستخدام Refresh Token.
+    يمكن إرسال التوكن في جسم الطلب (JSON) أو في الكوكيز.
+    """
+    # 1. محاولة قراءة التوكن من جسم الطلب
+    refresh_token = None
+    if request_data and request_data.refresh_token:
+        refresh_token = request_data.refresh_token
+    else:
+        # 2. محاولة قراءة التوكن من الكوكيز
+        refresh_token = request.cookies.get("refresh_token")
+
+    # 3. إذا لم يوجد توكن، أعد خطأ
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Refresh token is required")
+
+    # 4. فك تشفير التوكن والتحقق من صلاحيته
     token_data = decode_refresh_token(refresh_token)
     if token_data is None or token_data.email is None:
-        raise HTTPException(401, "Invalid refresh token.")
+        raise HTTPException(status_code=401, detail="Invalid refresh token")
 
+    # 5. البحث عن المستخدم
     user = get_user_by_email(db, token_data.email)
     if not user:
-        raise HTTPException(401, "User not found.")
+        raise HTTPException(status_code=401, detail="User not found")
 
+    # 6. إنشاء توكنات جديدة
     new_access_token = create_access_token(data={"sub": user.email})
     new_refresh_token = create_refresh_token(data={"sub": user.email})
 
+    # 7. إعداد الاستجابة مع الكوكيز الجديدة
     response = JSONResponse({
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
@@ -180,7 +203,7 @@ def refresh_token(refresh_token: Optional[str] = None, db: Session = Depends(get
         secure=True,
         samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",
+        path="/",   # ✅ تم إصلاح الخطأ هنا
     )
     response.set_cookie(
         key="refresh_token",

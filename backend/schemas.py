@@ -28,3 +28,6 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     email: Optional[str] = None
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
