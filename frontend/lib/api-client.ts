@@ -1,3 +1,5 @@
+import { API_BASE } from './api';
+
 export type ApiErrorKind = "network" | "timeout" | "server" | "parse" | "aborted";
 
 export class ApiError extends Error {
@@ -12,22 +14,18 @@ export class ApiError extends Error {
   }
 }
 
-// Use static URL directly to avoid environment issues
-const API_BASE = 'https://data-cleaning-agent-production.up.railway.app';
-// const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-// ✅ زيادة المهلة إلى 25 دقيقة (1,500,000 مللي ثانية)
-const UPLOAD_TIMEOUT_MS = 1_500_000;
+const UPLOAD_TIMEOUT_MS = 300_000;
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;
 }
 
-/**
- * POSTs a dataset to the FastAPI backend's `/clean` endpoint as
- * multipart/form-data and resolves with the parsed JSON report.
- */
+function getTokenFromCookies(): string | null {
+  const match = document.cookie.match(/(^| )access_token=([^;]+)/);
+  return match ? match[2] : null;
+}
+
 export function uploadDatasetToBackend(
   file: File,
   { onProgress, signal }: UploadOptions = {}
@@ -37,8 +35,15 @@ export function uploadDatasetToBackend(
     const formData = new FormData();
     formData.append("file", file);
 
-    xhr.open("POST", `${API_BASE}/clean`, true);
+    const token = getTokenFromCookies();
+    const url = `${API_BASE}/clean`;
+
+    xhr.open("POST", url, true);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
+
+    if (token) {
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+    }
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
@@ -48,19 +53,17 @@ export function uploadDatasetToBackend(
 
     xhr.onload = () => {
       const isSuccess = xhr.status >= 200 && xhr.status < 300;
-
       if (!isSuccess) {
         let message = `The cleaning service returned an error (status ${xhr.status}).`;
         try {
           const body = JSON.parse(xhr.responseText);
           if (typeof body?.detail === "string") message = body.detail;
         } catch {
-          // response wasn't JSON — keep the default message
+          // Ignore
         }
         reject(new ApiError("server", message, xhr.status));
         return;
       }
-
       try {
         resolve(JSON.parse(xhr.responseText));
       } catch {
@@ -69,12 +72,7 @@ export function uploadDatasetToBackend(
     };
 
     xhr.onerror = () => {
-      reject(
-        new ApiError(
-          "network",
-          `Could not reach the cleaning service at ${API_BASE}. Make sure the backend is running.`
-        )
-      );
+      reject(new ApiError("network", `Could not reach the cleaning service at ${API_BASE}.`));
     };
 
     xhr.ontimeout = () => {

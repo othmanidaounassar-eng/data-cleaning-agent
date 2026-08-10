@@ -4,149 +4,266 @@ import time
 import traceback
 import base64
 from io import BytesIO
-import pandas as pd
+from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+import pandas as pd
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.orm import Session
 
-from config import UPLOAD_FOLDER, OUTPUT_FOLDER
+from config import (
+    UPLOAD_FOLDER, OUTPUT_FOLDER, CORS_ORIGINS,
+    RATE_LIMIT_REQUESTS, RATE_LIMIT_PERIOD, ACCESS_TOKEN_EXPIRE_MINUTES,
+    REFRESH_TOKEN_EXPIRE_DAYS, ALLOWED_EXTENSIONS
+)
 from reader import read_data
 from analyzer import analyze_data
 from cleaner import clean_data
 from report import generate_report
 from exporter import save_output
+from database import engine, Base, get_db
+from models import User
+from schemas import UserCreate, UserOut, Token
+from auth import (
+    create_access_token,
+    create_refresh_token,
+    verify_password,
+    get_user_by_email,
+    create_user,
+    decode_refresh_token,
+    get_current_active_user,
+)
+from rate_limiter import setup_rate_limiter, limiter
 
+# ============================================
+# 1. إنشاء جداول قاعدة البيانات
+# ============================================
+Base.metadata.create_all(bind=engine)
+
+# ============================================
+# 2. إنشاء تطبيق FastAPI
+# ============================================
 app = FastAPI(
     title="AI Data Cleaning Agent",
     version="1.0",
-    description="API for cleaning and analyzing CSV/Excel files.",
+    description="Secure data cleaning with JWT authentication.",
 )
 
 # ============================================
-# CORS - السماح للواجهة الأمامية بالاتصال
+# 3. تفعيل Rate Limiting
+# ============================================
+setup_rate_limiter(app)
+
+# ============================================
+# 4. إضافة رؤوس الأمان (CSP, X-Frame-Options, إلخ)
+# ============================================
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' https://data-cleaning-agent-production.up.railway.app; "
+        "frame-ancestors 'none'; "
+        "form-action 'self'; "
+        "base-uri 'self'; "
+        "upgrade-insecure-requests;"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
+# ============================================
+# 5. CORS (مقيد بالنطاقات المسموح بها)
 # ============================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://data-cleaning-agent-woad.vercel.app",
-        "https://data-cleaning-agent-production.up.railway.app",
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Content-Disposition"],
+    max_age=86400,
 )
 
 # ============================================
-# إنشاء المجلدات
+# 6. إنشاء مجلدات التحميل
 # ============================================
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 # ============================================
-# دالة تحويل DataFrame إلى Base64
+# 7. دالة مساعدة: تحويل DataFrame إلى Base64
 # ============================================
 def dataframe_to_base64(df: pd.DataFrame) -> str:
-    """Convert DataFrame to base64 encoded CSV."""
     buffer = BytesIO()
     df.to_csv(buffer, index=False, encoding='utf-8-sig')
     buffer.seek(0)
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
 
 # ============================================
-# نقاط النهاية (Endpoints)
+# 8. نقاط نهاية المصادقة (محمية بـ Rate Limiting)
 # ============================================
 
-@app.get("/")
-def home():
-    return {
-        "message": "AI Data Cleaning Agent is Running",
-        "status": "healthy",
-        "version": "1.0"
-    }
+@app.post("/auth/register", response_model=UserOut, status_code=201)
+@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
+def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
+    """تسجيل مستخدم جديد."""
+    return create_user(db, user)
+
+@app.post("/auth/login", response_model=Token)
+@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
+def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    """تسجيل الدخول وإرجاع توكنات مع تعيين Cookies آمنة."""
+    user = get_user_by_email(db, form_data.username)
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(401, "Incorrect email or password.")
+
+    access_token = create_access_token(data={"sub": user.email})
+    refresh_token = create_refresh_token(data={"sub": user.email})
+
+    response = JSONResponse({
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    })
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/auth/refresh",
+    )
+    return response
+
+@app.post("/auth/refresh", response_model=Token)
+def refresh_token(refresh_token: Optional[str] = None, db: Session = Depends(get_db)):
+    """تجديد التوكنات باستخدام Refresh Token."""
+    token_data = decode_refresh_token(refresh_token)
+    if token_data is None or token_data.email is None:
+        raise HTTPException(401, "Invalid refresh token.")
+
+    user = get_user_by_email(db, token_data.email)
+    if not user:
+        raise HTTPException(401, "User not found.")
+
+    new_access_token = create_access_token(data={"sub": user.email})
+    new_refresh_token = create_refresh_token(data={"sub": user.email})
+
+    response = JSONResponse({
+        "access_token": new_access_token,
+        "refresh_token": new_refresh_token,
+        "token_type": "bearer"
+    })
+    response.set_cookie(
+        key="access_token",
+        value=new_access_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        path="/auth/refresh",
+    )
+    return response
+
+@app.post("/logout")
+def logout():
+    """تسجيل الخروج وحذف الكوكيز."""
+    response = JSONResponse({"message": "Logged out successfully"})
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/auth/refresh")
+    return response
+
+@app.get("/auth/me", response_model=UserOut)
+def read_users_me(current_user: User = Depends(get_current_active_user)):
+    """جلب بيانات المستخدم الحالي."""
+    return current_user
+
+# ============================================
+# 9. نقطة تنظيف البيانات (محمية بالمصادقة)
+# ============================================
 
 @app.post("/clean")
-async def clean_dataset(file: UploadFile = File(...)):
+def clean_dataset(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+):
+    """رفع ملف CSV/Excel وتنظيفه (يتطلب تسجيل دخول)."""
     start_time = time.time()
     try:
-        # حفظ الملف المؤقت
+        file_extension = os.path.splitext(file.filename)[1].lower()
+        if file_extension not in ALLOWED_EXTENSIONS:
+            raise HTTPException(400, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
+
+        MAX_FILE_SIZE = 50 * 1024 * 1024
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+        if file_size > MAX_FILE_SIZE:
+            raise HTTPException(413, "File too large. Maximum size is 50 MB.")
+
         file_path = os.path.join(UPLOAD_FOLDER, file.filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        file_size = os.path.getsize(file_path)
-        USE_CHUNKING = file_size > 10 * 1024 * 1024  # 10 ميجابايت
-
-        if USE_CHUNKING:
-            # ============================================
-            # معالجة الملفات الكبيرة على شكل أجزاء (Chunking)
-            # ============================================
-            chunk_size = 10000
-            cleaned_chunks = []
-            cleaning_reports = []
-            total_rows = 0
-
-            for chunk in pd.read_csv(file_path, chunksize=chunk_size, encoding='utf-8', on_bad_lines='skip'):
-                cleaned_chunk, chunk_report = clean_data(chunk)
-                cleaned_chunks.append(cleaned_chunk)
-                cleaning_reports.append(chunk_report)
-                total_rows += len(chunk)
-
-            cleaned_df = pd.concat(cleaned_chunks, ignore_index=True) if cleaned_chunks else pd.DataFrame()
-            before = {}
-
-            # دمج التقارير من جميع الأجزاء
-            cleaning_report = {
-                "duplicates_removed": sum(r.get("duplicates_removed", 0) for r in cleaning_reports),
-                "missing_values_filled": sum(r.get("missing_values_filled", 0) for r in cleaning_reports),
-                "outliers_detected": sum(r.get("outliers_detected", 0) for r in cleaning_reports),
-                "text_columns_cleaned": list(set().union(*[set(r.get("text_columns_cleaned", [])) for r in cleaning_reports])),
-                "operations": [op for r in cleaning_reports for op in r.get("operations", [])],
-                "alerts": [alert for r in cleaning_reports for alert in r.get("alerts", [])],
-                "sample": cleaned_df.head(5).to_dict(orient='records') if not cleaned_df.empty else [],
-                "summary": f"Processed {total_rows} rows in chunks.",
-                "recommendations": ["Data quality is acceptable for analysis."],
-                "column_conversions": [],
-            }
-        else:
-            # ============================================
-            # للملفات الصغيرة: استخدام read_data (يدعم CSV, Excel, JSON)
-            # ============================================
-            df = read_data(file_path)
-            before = analyze_data(df)
-            cleaned_df, cleaning_report = clean_data(df)
-
-        # تحليل البيانات بعد التنظيف
+        df = read_data(file_path)
+        before = analyze_data(df)
+        cleaned_df, cleaning_report = clean_data(df)
         after = analyze_data(cleaned_df)
+        _ = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
 
-        # حفظ الملف المنظف
-        saved_file = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
         execution_time = time.time() - start_time
-
-        # إنشاء التقرير النهائي
         report = generate_report(before, after, cleaning_report, execution_time)
 
-        # تحويل الملف المنظف إلى Base64 للتحميل المباشر
         csv_bytes = dataframe_to_base64(cleaned_df)
         report["download_url"] = f"data:text/csv;base64,{csv_bytes}"
         report["cleaned_file_name"] = f"cleaned_{int(time.time())}.csv"
+        report["user_id"] = current_user.id
 
         return JSONResponse(content=report)
-
     except Exception as error:
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(error)}")
+        raise HTTPException(500, f"Error: {str(error)}")
 
 # ============================================
-# تشغيل الخادم محلياً
+# 10. نقطة الصحة (Health Check)
+# ============================================
+
+@app.get("/")
+def home():
+    return {"message": "AI Data Cleaning Agent is Running", "status": "healthy"}
+
+# ============================================
+# 11. تشغيل الخادم محلياً
 # ============================================
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=True,
-    )
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
