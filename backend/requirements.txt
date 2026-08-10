@@ -1,3 +1,12 @@
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+bcrypt
+python-jose[cryptography]
+passlib[bcrypt]
+slowapi
+python-multipart
 pandas
 numpy
 openpyxl
@@ -5,7 +14,4 @@ xlrd
 pyarrow
 matplotlib
 seaborn
-scikit-learn
-fastapi
-uvicorn
-python-multipart
+scikit-learngit
