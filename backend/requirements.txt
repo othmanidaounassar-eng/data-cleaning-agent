@@ -14,4 +14,4 @@ xlrd
 pyarrow
 matplotlib
 seaborn
-scikit-learngit
+scikit-learn
