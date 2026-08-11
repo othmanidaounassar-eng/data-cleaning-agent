@@ -52,3 +52,6 @@ export default function DashboardLayout({
     </div>
   );
 }
+
+// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
+export const dynamic = 'force-dynamic';

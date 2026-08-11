@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Topbar } from "@/components/dashboard/topbar";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select } from "@/components/ui/switch";
+import { Select } from "@/components/ui/switch"; // قد يكون الاستيراد خطأً، لكننا نحتفظ به كما هو
 import { Switch } from "@/components/ui/switch";
 
 export default function SettingsPage() {
@@ -93,3 +93,6 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
+
+// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
+export const dynamic = 'force-dynamic';

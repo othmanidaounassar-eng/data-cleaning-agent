@@ -58,3 +58,6 @@ export default function ReportsPage() {
     </>
   );
 }
+
+// ✅ منع التصيير الثابت (Static Prerendering) لتوحيد السلوك مع باقي صفحات dashboard
+export const dynamic = 'force-dynamic';

@@ -115,3 +115,6 @@ export default function UploadPage() {
     </>
   );
 }
+
+// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
+export const dynamic = 'force-dynamic';

@@ -88,3 +88,6 @@ export default function HistoryPage() {
     </>
   );
 }
+
+// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
+export const dynamic = 'force-dynamic';
