@@ -15,3 +15,4 @@ pyarrow
 matplotlib
 seaborn
 scikit-learn
+email-validator
