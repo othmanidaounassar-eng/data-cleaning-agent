@@ -25,7 +25,7 @@ from report import generate_report
 from exporter import save_output
 from database import engine, Base, get_db
 from models import User
-from schemas import UserCreate, UserOut, Token, RefreshTokenRequest
+from schemas import UserCreate, UserOut, Token, RefreshTokenRequest  # ✅ تم التصحيح
 from auth import (
     create_access_token,
     create_refresh_token,
@@ -113,16 +113,18 @@ def dataframe_to_base64(df: pd.DataFrame) -> str:
 # ============================================
 
 @app.post("/auth/register", response_model=UserOut, status_code=201)
-# @limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")  # معلق مؤقتاً للاختبار
+@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
 def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     """تسجيل مستخدم جديد."""
     return create_user(db, user)
 
 @app.post("/auth/login", response_model=Token)
-# @limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")  # معلق مؤقتاً للاختبار
+@limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """تسجيل الدخول وإرجاع توكنات مع تعيين Cookies آمنة."""
-    user = get_user_by_email(db, form_data.username)
+    # ✅ تحويل البريد الإلكتروني إلى صغيرة ليتطابق مع التخزين
+    email = form_data.username.lower()
+    user = get_user_by_email(db, email)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(401, "Incorrect email or password.")
 
@@ -203,7 +205,7 @@ def refresh_token(
         secure=True,
         samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        path="/",   # ✅ تم إصلاح الخطأ هنا
+        path="/",
     )
     response.set_cookie(
         key="refresh_token",

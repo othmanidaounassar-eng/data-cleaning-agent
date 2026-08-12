@@ -29,5 +29,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: Optional[str] = None
 
+# ✅ تم إضافة هذا النموذج لدعم /auth/refresh
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
