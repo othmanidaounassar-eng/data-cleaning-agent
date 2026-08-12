@@ -11,12 +11,34 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // ✅ التحقق من صحة البريد الإلكتروني قبل الإرسال
+  const validateEmail = (email: string) => {
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(email);
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // ✅ التحقق من صحة المدخلات
+    if (!email.trim() || !password.trim()) {
+      setError("يرجى إدخال البريد الإلكتروني وكلمة المرور.");
+      return;
+    }
+
+    if (!validateEmail(email)) {
+      setError("يرجى إدخال بريد إلكتروني صحيح (مثل: user@example.com).");
+      return;
+    }
+
+    if (password.length < 8) {
+      setError("كلمة المرور يجب أن تكون 8 أحرف على الأقل.");
+      return;
+    }
+
     setLoading(true);
 
-    // ✅ طباعة الرابط للتأكد من صحته
     const url = `${API_BASE}/auth/login`;
     console.log("🔍 Sending login request to:", url);
     console.log("📧 Email:", email);
@@ -30,7 +52,7 @@ export default function LoginPage() {
         credentials: "include",
       });
 
-      // ✅ قراءة الاستجابة كنص أولاً، ثم محاولة تحويلها إلى JSON
+      // ✅ قراءة الاستجابة ومعالجتها
       const responseText = await res.text();
       console.log("📦 Response status:", res.status);
       console.log("📄 Response text:", responseText);
@@ -39,11 +61,12 @@ export default function LoginPage() {
       try {
         data = JSON.parse(responseText);
       } catch {
-        throw new Error(`Server returned non-JSON response: ${responseText.substring(0, 100)}`);
+        throw new Error(`الخادم أعاد استجابة غير متوقعة: ${responseText.substring(0, 100)}`);
       }
 
       if (!res.ok) {
-        const errorMsg = data.detail || data.message || "Login failed";
+        // ✅ عرض رسالة الخطأ من الخادم
+        const errorMsg = data.detail || data.message || "فشل تسجيل الدخول. تحقق من البريد وكلمة المرور.";
         throw new Error(errorMsg);
       }
 
@@ -51,7 +74,7 @@ export default function LoginPage() {
       router.push("/dashboard");
     } catch (err: any) {
       console.error("❌ Login error:", err);
-      setError(err.message || "An unexpected error occurred");
+      setError(err.message || "حدث خطأ غير متوقع. حاول مرة أخرى.");
     } finally {
       setLoading(false);
     }
@@ -79,12 +102,13 @@ export default function LoginPage() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور (8 أحرف على الأقل)</label>
             <input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              minLength={8}
               className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
               placeholder="••••••••"
             />

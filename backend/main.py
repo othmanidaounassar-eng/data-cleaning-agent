@@ -25,7 +25,7 @@ from report import generate_report
 from exporter import save_output
 from database import engine, Base, get_db
 from models import User
-from schemas import UserCreate, UserOut, Token, RefreshTokenRequest  # ✅ تم التصحيح
+from schemas import UserCreate, UserOut, Token, RefreshTokenRequest
 from auth import (
     create_access_token,
     create_refresh_token,
@@ -56,6 +56,7 @@ app = FastAPI(
 # ============================================
 setup_rate_limiter(app)
 
+
 # ============================================
 # 4. إضافة رؤوس الأمان (CSP, X-Frame-Options, إلخ)
 # ============================================
@@ -80,6 +81,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
+
 # ============================================
 # 5. CORS (مقيد بالنطاقات المسموح بها)
 # ============================================
@@ -99,6 +101,7 @@ app.add_middleware(
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+
 # ============================================
 # 7. دالة مساعدة: تحويل DataFrame إلى Base64
 # ============================================
@@ -107,6 +110,7 @@ def dataframe_to_base64(df: pd.DataFrame) -> str:
     df.to_csv(buffer, index=False, encoding='utf-8-sig')
     buffer.seek(0)
     return base64.b64encode(buffer.getvalue()).decode('utf-8')
+
 
 # ============================================
 # 8. نقاط نهاية المصادقة (محمية بـ Rate Limiting)
@@ -118,15 +122,33 @@ def register(request: Request, user: UserCreate, db: Session = Depends(get_db)):
     """تسجيل مستخدم جديد."""
     return create_user(db, user)
 
+
 @app.post("/auth/login", response_model=Token)
 @limiter.limit(f"{RATE_LIMIT_REQUESTS}/{RATE_LIMIT_PERIOD}seconds")
 def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    """تسجيل الدخول وإرجاع توكنات مع تعيين Cookies آمنة."""
-    # ✅ تحويل البريد الإلكتروني إلى صغيرة ليتطابق مع التخزين
+    """تسجيل الدخول مع سجلات التصحيح."""
     email = form_data.username.lower()
+
+    # ✅ سجلات التصحيح (تظهر في Railway logs)
+    print(f"[DEBUG] Login attempt for email: {email}")
+
     user = get_user_by_email(db, email)
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    if user:
+        print(f"[DEBUG] User found: {user.email}")
+        print(f"[DEBUG] Stored hash (first 20 chars): {user.hashed_password[:20]}...")
+    else:
+        print(f"[DEBUG] User NOT found for email: {email}")
         raise HTTPException(401, "Incorrect email or password.")
+
+    # التحقق من كلمة المرور
+    password_valid = verify_password(form_data.password, user.hashed_password)
+    print(f"[DEBUG] Password valid: {password_valid}")
+
+    if not password_valid:
+        print("[DEBUG] Password verification failed.")
+        raise HTTPException(401, "Incorrect email or password.")
+
+    print("[DEBUG] Login successful, generating tokens.")
 
     access_token = create_access_token(data={"sub": user.email})
     refresh_token = create_refresh_token(data={"sub": user.email})
@@ -156,43 +178,36 @@ def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends(), db
     )
     return response
 
+
 @app.post("/auth/refresh", response_model=Token)
 def refresh_token(
-    request: Request,
-    request_data: Optional[RefreshTokenRequest] = None,
-    db: Session = Depends(get_db)
+        request: Request,
+        request_data: Optional[RefreshTokenRequest] = None,
+        db: Session = Depends(get_db)
 ):
     """
     تجديد التوكنات باستخدام Refresh Token.
-    يمكن إرسال التوكن في جسم الطلب (JSON) أو في الكوكيز.
     """
-    # 1. محاولة قراءة التوكن من جسم الطلب
     refresh_token = None
     if request_data and request_data.refresh_token:
         refresh_token = request_data.refresh_token
     else:
-        # 2. محاولة قراءة التوكن من الكوكيز
         refresh_token = request.cookies.get("refresh_token")
 
-    # 3. إذا لم يوجد توكن، أعد خطأ
     if not refresh_token:
         raise HTTPException(status_code=400, detail="Refresh token is required")
 
-    # 4. فك تشفير التوكن والتحقق من صلاحيته
     token_data = decode_refresh_token(refresh_token)
     if token_data is None or token_data.email is None:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
 
-    # 5. البحث عن المستخدم
     user = get_user_by_email(db, token_data.email)
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    # 6. إنشاء توكنات جديدة
     new_access_token = create_access_token(data={"sub": user.email})
     new_refresh_token = create_refresh_token(data={"sub": user.email})
 
-    # 7. إعداد الاستجابة مع الكوكيز الجديدة
     response = JSONResponse({
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
@@ -218,18 +233,19 @@ def refresh_token(
     )
     return response
 
+
 @app.post("/logout")
 def logout():
-    """تسجيل الخروج وحذف الكوكيز."""
     response = JSONResponse({"message": "Logged out successfully"})
     response.delete_cookie("access_token", path="/")
     response.delete_cookie("refresh_token", path="/auth/refresh")
     return response
 
+
 @app.get("/auth/me", response_model=UserOut)
 def read_users_me(current_user: User = Depends(get_current_active_user)):
-    """جلب بيانات المستخدم الحالي."""
     return current_user
+
 
 # ============================================
 # 9. نقطة تنظيف البيانات (محمية بالمصادقة)
@@ -237,11 +253,10 @@ def read_users_me(current_user: User = Depends(get_current_active_user)):
 
 @app.post("/clean")
 def clean_dataset(
-    request: Request,
-    file: UploadFile = File(...),
-    current_user: User = Depends(get_current_active_user),
+        request: Request,
+        file: UploadFile = File(...),
+        current_user: User = Depends(get_current_active_user),
 ):
-    """رفع ملف CSV/Excel وتنظيفه (يتطلب تسجيل دخول)."""
     start_time = time.time()
     try:
         file_extension = os.path.splitext(file.filename)[1].lower()
@@ -278,6 +293,7 @@ def clean_dataset(
         traceback.print_exc()
         raise HTTPException(500, f"Error: {str(error)}")
 
+
 # ============================================
 # 10. نقطة الصحة (Health Check)
 # ============================================
@@ -286,9 +302,11 @@ def clean_dataset(
 def home():
     return {"message": "AI Data Cleaning Agent is Running", "status": "healthy"}
 
+
 # ============================================
 # 11. تشغيل الخادم محلياً
 # ============================================
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
