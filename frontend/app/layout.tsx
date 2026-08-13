@@ -1,13 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import dynamic from "next/dynamic";
-
-// تحميل AuthProvider ديناميكياً (فقط في بيئة العميل) لحل مشكلة useAuth
-const AuthProvider = dynamic(
-  () => import("@/context/AuthContext").then((mod) => mod.AuthProvider),
-  { ssr: false }
-);
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -41,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body>
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );
