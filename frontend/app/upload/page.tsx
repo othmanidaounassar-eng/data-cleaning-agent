@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { UploadCloud, Download, FileText } from "lucide-react";
+import { UploadCloud } from "lucide-react";
 import { API_BASE } from "@/lib/api";
 
 export default function UploadPage() {
@@ -97,17 +97,14 @@ export default function UploadPage() {
                 <div>Missing Values Filled: {result.missing_values_filled}</div>
               </div>
               {result.download_url && (
-                <div className="mt-6 flex gap-4">
+                <div className="mt-6">
                   <a
                     href={result.download_url}
                     download
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg inline-block transition"
                   >
-                    <Download className="w-4 h-4" /> Download Cleaned File
+                    Download Cleaned File
                   </a>
-                  <button className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 px-4 py-2 rounded-lg flex items-center gap-2 transition">
-                    <FileText className="w-4 h-4" /> Download Report
-                  </button>
                 </div>
               )}
             </div>
