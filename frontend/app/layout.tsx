@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/context/AuthContext";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -21,9 +22,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI Data Cleaning Agent",
+  title: "OQZARO DataCleaning | AI Data Cleaning Agent",
   description:
-    "Upload a dataset, let the agent clean it automatically, and download a production-ready dataset with a full quality report.",
+    "Upload your CSV or Excel files and let OQZARO DataCleaning Agent clean, analyze, and export your data with AI-powered precision.",
 };
 
 export default function RootLayout({
@@ -33,8 +34,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body>
-        {children}
+      <body className="bg-dark-blue-900 text-white min-h-screen">
+        <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
   );

@@ -21,7 +21,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // مؤقتاً: يمكنك إضافة منطق جلب المستخدم لاحقاً
     setIsLoading(false);
   }, []);
 

@@ -4,46 +4,46 @@ import Link from "next/link";
 import { FileUp, History, Settings } from "lucide-react";
 
 export default function DashboardPage() {
-  // 🔹 مؤقتاً: استخدام مستخدم وهمي (بدون مصادقة)
-  const user = { full_name: "مستخدم" };
+  // 🔹 مستخدم وهمي (بدون مصادقة)
+  const user = { full_name: "Guest" };
 
   return (
     <div className="space-y-6">
-      <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-        <h1 className="text-2xl font-bold text-gray-800">
-          مرحباً بعودتك، {user?.full_name || "مستخدم"}! 👋
+      <div className="bg-dark-blue-800 p-6 rounded-lg border border-orange-500/20">
+        <h1 className="text-2xl font-bold text-white">
+          Welcome back, {user?.full_name || "Guest"}! 👋
         </h1>
-        <p className="text-gray-600 mt-2">
-          يمكنك رفع ملف CSV أو Excel لتنظيفه، أو مراجعة تاريخ عملياتك السابقة.
+        <p className="text-white/70 mt-2">
+          Upload a CSV or Excel file to clean, or review your previous cleaning history.
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
           href="/dashboard/upload"
-          className="bg-blue-50 hover:bg-blue-100 transition p-6 rounded-lg border border-blue-200 flex flex-col items-center justify-center gap-2"
+          className="bg-dark-blue-800 hover:bg-dark-blue-700 transition p-6 rounded-lg border border-orange-500/20 flex flex-col items-center justify-center gap-2"
         >
-          <FileUp className="w-8 h-8 text-blue-600" />
-          <span className="font-medium text-blue-700">رفع ملف جديد</span>
-          <span className="text-sm text-gray-500">ابدأ بتنظيف بياناتك</span>
+          <FileUp className="w-8 h-8 text-orange-500" />
+          <span className="font-medium text-white">Upload New File</span>
+          <span className="text-sm text-white/60">Start cleaning your data</span>
         </Link>
 
         <Link
           href="/dashboard/history"
-          className="bg-green-50 hover:bg-green-100 transition p-6 rounded-lg border border-green-200 flex flex-col items-center justify-center gap-2"
+          className="bg-dark-blue-800 hover:bg-dark-blue-700 transition p-6 rounded-lg border border-orange-500/20 flex flex-col items-center justify-center gap-2"
         >
-          <History className="w-8 h-8 text-green-600" />
-          <span className="font-medium text-green-700">تاريخ العمليات</span>
-          <span className="text-sm text-gray-500">عرض الملفات السابقة</span>
+          <History className="w-8 h-8 text-orange-500" />
+          <span className="font-medium text-white">Cleaning History</span>
+          <span className="text-sm text-white/60">View previous files</span>
         </Link>
 
         <Link
           href="/dashboard/settings"
-          className="bg-gray-50 hover:bg-gray-100 transition p-6 rounded-lg border border-gray-200 flex flex-col items-center justify-center gap-2"
+          className="bg-dark-blue-800 hover:bg-dark-blue-700 transition p-6 rounded-lg border border-orange-500/20 flex flex-col items-center justify-center gap-2"
         >
-          <Settings className="w-8 h-8 text-gray-600" />
-          <span className="font-medium text-gray-700">الإعدادات</span>
-          <span className="text-sm text-gray-500">تعديل الملف الشخصي</span>
+          <Settings className="w-8 h-8 text-orange-500" />
+          <span className="font-medium text-white">Settings</span>
+          <span className="text-sm text-white/60">Manage your profile</span>
         </Link>
       </div>
     </div>
