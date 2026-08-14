@@ -1,11 +1,11 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import { FileUp, History, Settings } from "lucide-react";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  // 🔹 مؤقتاً: استخدام مستخدم وهمي (بدون مصادقة)
+  const user = { full_name: "مستخدم" };
 
   return (
     <div className="space-y-6">
@@ -49,6 +49,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
-export const dynamic = 'force-dynamic';

@@ -1,57 +1,41 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, logout, isLoading } = useAuth();
-  const router = useRouter();
-
-  const handleLogout = async () => {
-    await logout();
-    router.push("/login");
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">جاري التحقق من الجلسة...</div>
-      </div>
-    );
-  }
+  // ✅ إزالة useAuth بالكامل
+  // ✅ لا نحتاج إلى Router أو Logout
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <nav className="bg-white shadow-md px-6 py-3 flex justify-between items-center">
+    <div className="min-h-screen bg-dark-blue-900">
+      {/* شريط تنقل مبسط (بدون مصادقة) */}
+      <nav className="bg-dark-blue-800 border-b border-orange-500/30 px-6 py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-4">
-          <Link href="/dashboard" className="text-xl font-bold text-blue-600">
-            AI Data Cleaning
+          <Link href="/" className="text-2xl font-bold text-orange-500 hover:text-orange-400 transition">
+            OQZARO
           </Link>
-          <span className="text-sm text-gray-500 hidden sm:inline">
-            لوحة التحكم
+          <span className="text-sm text-gray-400 hidden sm:inline">
+            وكيل تحليل البيانات
           </span>
         </div>
         <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-700">
-            👋 مرحباً، <strong>{user?.full_name || "مستخدم"}</strong>
-          </span>
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 hover:bg-red-600 text-white text-sm px-4 py-2 rounded-md transition"
+          {/* يمكن إضافة زر للرجوع للصفحة الرئيسية أو أيقونة مساعدة */}
+          <Link
+            href="/"
+            className="text-sm text-gray-300 hover:text-orange-500 transition"
           >
-            تسجيل الخروج
-          </button>
+            الرئيسية
+          </Link>
         </div>
       </nav>
-      <main className="p-6">{children}</main>
+      <main className="p-6 max-w-7xl mx-auto">{children}</main>
     </div>
   );
 }
 
-// ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
+// ✅ منع التصيير الثابت (اختياري، يمكن حذفه)
 export const dynamic = 'force-dynamic';

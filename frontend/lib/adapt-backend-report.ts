@@ -2,6 +2,7 @@
 
 import { CleaningReport, CleaningStats } from './types';
 
+
 type AnyRecord = Record<string, any>;
 
 // 👇 نضع الرابط هنا مباشرة لقطع الشك باليقين
