@@ -27,17 +27,19 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero Section - شعار الشركة بدلاً من الإيموجي */}
       <section className="flex flex-col items-center justify-center text-center px-4 py-20 max-w-4xl mx-auto">
-        <div className="text-7xl text-orange-500 mb-6">🤖</div>
+        <div className="w-24 h-24 rounded-full bg-orange-500/20 border-2 border-orange-500 flex items-center justify-center mb-6">
+          <span className="text-5xl font-bold text-orange-500">O</span>
+        </div>
         <h1 className="text-4xl md:text-6xl font-bold text-white">
           Smart <span className="text-orange-500">Data Cleaning</span> Agent
         </h1>
         <p className="text-white text-lg mt-4 max-w-2xl opacity-90">
-          Upload your CSV or Excel file and let AI clean and analyze your data in seconds.
+          Upload your CSV or Excel file and let AI clean your data in minutes
         </p>
         <div className="flex flex-wrap gap-4 mt-6">
-          <Link href="/register">
+          <Link href="/">
             <button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg text-lg font-semibold transition">
               Get Started
             </button>
