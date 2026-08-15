@@ -11,7 +11,7 @@ REPORT_FOLDER = os.path.join(BASE_DIR, "reports")
 for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, REPORT_FOLDER]:
     os.makedirs(folder, exist_ok=True)
 
-ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls", ".json", ".parquet"]
+ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls"]
 
 # ============================================
 # إعدادات الأمان

@@ -32,7 +32,18 @@ export default function UploadPage() {
         body: formData,
       });
 
-      const data = await res.json();
+      // ✅ قراءة الاستجابة كنص أولاً
+      const text = await res.text();
+      console.log("Response text:", text);
+
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // إذا لم تكن JSON، اعرض النص الخام
+        throw new Error(`الخادم أعاد استجابة غير متوقعة: ${text.substring(0, 200)}`);
+      }
+
       if (!res.ok) throw new Error(data.detail || "Upload failed");
       setResult(data);
     } catch (err: any) {

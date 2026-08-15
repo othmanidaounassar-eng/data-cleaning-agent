@@ -60,7 +60,7 @@ export default function UploadPage() {
               id="fileInput"
               className="hidden"
               onChange={handleFileChange}
-              accept=".csv,.xlsx,.xls,.json,.parquet"
+              accept=".csv,.xlsx,.xls"
             />
             <label
               htmlFor="fileInput"

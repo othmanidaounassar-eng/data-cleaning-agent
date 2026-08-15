@@ -14,16 +14,11 @@ export class ApiError extends Error {
   }
 }
 
-const UPLOAD_TIMEOUT_MS = 300_000;
+const UPLOAD_TIMEOUT_MS = 500_000;
 
 export interface UploadOptions {
   onProgress?: (percent: number) => void;
   signal?: AbortSignal;
-}
-
-function getTokenFromCookies(): string | null {
-  const match = document.cookie.match(/(^| )access_token=([^;]+)/);
-  return match ? match[2] : null;
 }
 
 export function uploadDatasetToBackend(
@@ -35,15 +30,12 @@ export function uploadDatasetToBackend(
     const formData = new FormData();
     formData.append("file", file);
 
-    const token = getTokenFromCookies();
     const url = `${API_BASE}/clean`;
 
     xhr.open("POST", url, true);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
 
-    if (token) {
-      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    }
+    // ✅ تم إزالة إرسال التوكن (Authorization) نهائياً
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {

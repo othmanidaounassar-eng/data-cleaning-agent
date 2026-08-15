@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/context/AuthContext";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -35,7 +34,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
       <body className="bg-dark-blue-900 text-white min-h-screen">
-        <AuthProvider>{children}</AuthProvider>
+        {children}
       </body>
     </html>
   );
