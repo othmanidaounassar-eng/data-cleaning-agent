@@ -14,19 +14,13 @@ for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, REPORT_FOLDER]:
 ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls"]
 
 # ============================================
-# إعدادات الأمان
+# CORS - السماح بالنطاقات المحددة فقط
 # ============================================
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY or len(SECRET_KEY) < 32:
-    raise ValueError("SECRET_KEY must be set and at least 32 characters long!")
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS", "https://data-cleaning-agent-woad.vercel.app"
+).split(",")
 
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", 7))
-
-CORS_ORIGINS = os.getenv("CORS_ORIGINS", "https://data-cleaning-agent-woad.vercel.app").split(",")
-
-RATE_LIMIT_REQUESTS = int(os.getenv("RATE_LIMIT_REQUESTS", 10))
-RATE_LIMIT_PERIOD = int(os.getenv("RATE_LIMIT_PERIOD", 100))
-
+# ============================================
+# قاعدة البيانات (اختياري، استخدمه إن أردت)
+# ============================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")

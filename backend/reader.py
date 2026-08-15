@@ -18,7 +18,5 @@ def read_data(file_path):
     elif extension in [".xlsx", ".xls"]:
         return pd.read_excel(file_path)
 
-
-
     else:
         raise ValueError(f"Unsupported file type: {extension}")

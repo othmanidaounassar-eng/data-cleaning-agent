@@ -2,6 +2,7 @@ import math
 import numpy as np
 import pandas as pd
 
+
 def convert_to_serializable(obj):
     """
     Convert numpy/pandas types to Python native types for JSON serialization.
@@ -25,7 +26,7 @@ def convert_to_serializable(obj):
     elif isinstance(obj, pd.Series):
         return [convert_to_serializable(item) for item in obj.to_list()]
     elif isinstance(obj, pd.DataFrame):
-        return obj.to_dict(orient='records')
+        return obj.to_dict(orient="records")
     elif isinstance(obj, dict):
         return {k: convert_to_serializable(v) for k, v in obj.items()}
     elif isinstance(obj, (list, tuple)):
@@ -33,7 +34,10 @@ def convert_to_serializable(obj):
     else:
         return obj
 
-def generate_report(before: dict, after: dict, cleaning_report: dict, execution_time: float) -> dict:
+
+def generate_report(
+    before: dict, after: dict, cleaning_report: dict, execution_time: float
+) -> dict:
     """
     Generate a structured report from the cleaning process results.
     """
@@ -46,7 +50,6 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
     missing_values_filled = cleaning_report.get("missing_values_filled", 0)
 
     quality_score = cleaning_report.get("quality_score", 0)
-    # ✅ الوقت بالثواني (بدلاً من المللي ثانية)
     processing_time_s = round(execution_time, 2)
 
     report = {
@@ -58,12 +61,15 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "missing_values_filled": missing_values_filled,
         "execution_time": execution_time,
         "quality_score": quality_score,
-        "processing_time_s": processing_time_s,  # ✅ الوقت بالثواني
+        "processing_time_s": processing_time_s,
         "sample": cleaning_report.get("sample", []),
         "alerts": cleaning_report.get("alerts", []),
         "summary": cleaning_report.get(
             "summary",
-            f"Cleaned {rows_before} rows. Removed {duplicates_removed} duplicates and filled {missing_values_filled} missing values."
+            (
+                f"Cleaned {rows_before} rows. Removed {duplicates_removed} duplicates "
+                f"and filled {missing_values_filled} missing values."
+            ),
         ),
         "operations": cleaning_report.get("operations", []),
         "recommendations": cleaning_report.get("recommendations", []),

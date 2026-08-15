@@ -1,10 +1,9 @@
 from reader import read_data
-from datatype import detect_datatype# ✅
-from cleaner import clean_data
+from cleaner import detect_datatype, clean_data
 from analyzer import analyze_data
 from report import generate_report
-from tkinter import Tk
-from tkinter import filedialog
+from tkinter import Tk, filedialog
+import time
 
 root = Tk()
 root.withdraw()
@@ -14,8 +13,8 @@ file_path = filedialog.askopenfilename(
     filetypes=[
         ("CSV Files", "*.csv"),
         ("Excel Files", "*.xlsx *.xls"),
-        ("All Files", "*.*")
-    ]
+        ("All Files", "*.*"),
+    ],
 )
 
 if not file_path:
@@ -30,8 +29,6 @@ print("تمت قراءة الملف")
 
 print(detect_datatype(df))
 
-import time
-
 start_time = time.time()
 
 analysis_before = analyze_data(df)
@@ -43,10 +40,7 @@ analysis_after = analyze_data(cleaned_df)
 execution_time = round(time.time() - start_time, 2)
 
 report = generate_report(
-    analysis_before,
-    analysis_after,
-    cleaning_report,
-    execution_time
+    analysis_before, analysis_after, cleaning_report, execution_time
 )
 
 print(report)

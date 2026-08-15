@@ -33,7 +33,7 @@ app = FastAPI(
 # ============================================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,  # تأكد من أن CORS_ORIGINS في config.py يحتوي على رابط Vercel
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,27 +45,38 @@ app.add_middleware(
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+
 # ============================================
 # 4. دالة مساعدة: تحويل DataFrame إلى Base64
 # ============================================
 def dataframe_to_base64(df: pd.DataFrame) -> str:
     buffer = BytesIO()
-    df.to_csv(buffer, index=False, encoding='utf-8-sig')
+    df.to_csv(buffer, index=False, encoding="utf-8-sig")
     buffer.seek(0)
-    return base64.b64encode(buffer.getvalue()).decode('utf-8')
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
 
 # ============================================
 # 5. نقطة تنظيف البيانات (رفع ملف)
 # ============================================
 
+
 @app.post("/clean")
 def clean_dataset(file: UploadFile = File(...)):
     start_time = time.time()
     try:
+        # ✅ التحقق من أن اسم الملف ليس None
+        if file.filename is None:
+            raise HTTPException(400, "File name is missing.")
+
+        filename = file.filename
+
         # التحقق من نوع الملف
-        file_extension = os.path.splitext(file.filename)[1].lower()
+        file_extension = os.path.splitext(filename)[1].lower()
         if file_extension not in ALLOWED_EXTENSIONS:
-            raise HTTPException(400, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
+            raise HTTPException(
+                400, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
+            )
 
         # الحد الأقصى لحجم الملف (50 ميجابايت)
         MAX_FILE_SIZE = 50 * 1024 * 1024
@@ -76,7 +87,7 @@ def clean_dataset(file: UploadFile = File(...)):
             raise HTTPException(413, "File too large. Maximum size is 50 MB.")
 
         # حفظ الملف المؤقت
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
@@ -85,7 +96,7 @@ def clean_dataset(file: UploadFile = File(...)):
         before = analyze_data(df)
         cleaned_df, cleaning_report = clean_data(df)
         after = analyze_data(cleaned_df)
-        _ = save_output(cleaned_df, OUTPUT_FOLDER, file.filename)
+        _ = save_output(cleaned_df, OUTPUT_FOLDER, filename)
 
         execution_time = time.time() - start_time
         report = generate_report(before, after, cleaning_report, execution_time)
@@ -100,13 +111,16 @@ def clean_dataset(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(500, f"Error: {str(error)}")
 
+
 # ============================================
 # 6. نقطة تنظيف البيانات من JSON (للأتمتة)
 # ============================================
 
+
 class DataPayload(BaseModel):
     data: List[Dict[str, Any]]
     source: Optional[str] = "manual"
+
 
 @app.post("/clean-json")
 def clean_json(payload: DataPayload):
@@ -126,28 +140,34 @@ def clean_json(payload: DataPayload):
         report = generate_report(before, after, cleaning_report, execution_time)
 
         # إضافة البيانات المنظفة كـ JSON
-        return JSONResponse(content={
-            "status": "success",
-            "report": report,
-            "cleaned_data": cleaned_df.to_dict(orient='records'),
-            "source": payload.source,
-            "execution_time": execution_time
-        })
+        return JSONResponse(
+            content={
+                "status": "success",
+                "report": report,
+                "cleaned_data": cleaned_df.to_dict(orient="records"),
+                "source": payload.source,
+                "execution_time": execution_time,
+            }
+        )
     except Exception as error:
         traceback.print_exc()
         raise HTTPException(500, f"Error: {str(error)}")
+
 
 # ============================================
 # 7. نقطة الصحة (Health Check)
 # ============================================
 
+
 @app.get("/")
 def home():
     return {"message": "OQZARO DataCleaning Agent is Running", "status": "healthy"}
+
 
 # ============================================
 # 8. تشغيل الخادم محلياً
 # ============================================
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
