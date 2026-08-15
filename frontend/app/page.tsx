@@ -39,7 +39,7 @@ export default function HomePage() {
           Upload your CSV or Excel file and let AI clean your data in seconds.
         </p>
         <div className="flex flex-wrap gap-4 mt-6">
-          <Link href="/upload">
+          <Link href="/dashboard/upload">
             <button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg text-lg font-semibold transition">
               Get Started
             </button>
