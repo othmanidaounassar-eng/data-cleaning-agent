@@ -11,7 +11,15 @@ export function buildCleaningReport(params: {
   processingTimeMs: number;
   qualityScore: number;
 }): CleaningReport {
-  const { fileName, rowsBefore, columnsBefore, missingBefore, outcome, processingTimeMs, qualityScore } = params;
+  const {
+    fileName,
+    rowsBefore,
+    columnsBefore,
+    missingBefore,
+    outcome,
+    processingTimeMs,
+    qualityScore,
+  } = params;
 
   const stats: CleaningStats = {
     rowsBefore,
@@ -31,7 +39,10 @@ export function buildCleaningReport(params: {
     { label: "Removed duplicate rows", done: outcome.duplicatesRemoved > 0 },
     { label: "Filled missing values", done: outcome.missingValuesFixed > 0 },
     { label: "Removed extra whitespace", done: true },
-    { label: "Removed invalid characters", done: outcome.charactersCleaned > 0 },
+    {
+      label: "Removed invalid characters",
+      done: outcome.charactersCleaned > 0,
+    },
     { label: "Fixed data types", done: outcome.columnsConverted > 0 },
     { label: "Detected outliers", done: outcome.outliersDetected > 0 },
     { label: "Standardized text values", done: true },
@@ -41,24 +52,33 @@ export function buildCleaningReport(params: {
   const recommendations: string[] = [];
   if (outcome.outliersDetected > 0) {
     recommendations.push(
-      `Consider reviewing the ${outcome.outliersDetected} detected outlier${outcome.outliersDetected === 1 ? "" : "s"} before building predictive models.`
+      `Consider reviewing the ${outcome.outliersDetected} detected outlier${outcome.outliersDetected === 1 ? "" : "s"} before building predictive models.`,
     );
   }
   if (missingBefore === 0 && outcome.duplicatesRemoved === 0) {
-    recommendations.push("Your dataset was already clean — only light validation was needed.");
+    recommendations.push(
+      "Your dataset was already clean — only light validation was needed.",
+    );
   }
   if (qualityScore >= 90) {
     recommendations.push("Your dataset is now ready for analysis.");
   } else if (qualityScore >= 70) {
-    recommendations.push("Dataset quality is good. Spot-check the modified columns before analysis.");
+    recommendations.push(
+      "Dataset quality is good. Spot-check the modified columns before analysis.",
+    );
   } else {
-    recommendations.push("Quality score is moderate — consider a manual review of the source data.");
+    recommendations.push(
+      "Quality score is moderate — consider a manual review of the source data.",
+    );
   }
 
   return {
     id: uid(),
     fileName,
-    cleanedFileName: fileName.replace(/\.(csv|xlsx|xls)$/i, (m) => `_cleaned${m}`),
+    cleanedFileName: fileName.replace(
+      /\.(csv|xlsx|xls)$/i,
+      (m) => `_cleaned${m}`,
+    ),
     cleaningDate: new Date().toISOString(),
     stats,
     operations,

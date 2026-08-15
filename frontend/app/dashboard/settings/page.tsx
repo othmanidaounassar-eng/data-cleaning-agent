@@ -2,7 +2,12 @@
 
 import { useState } from "react";
 import { Topbar } from "@/components/dashboard/topbar";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Select } from "@/components/ui/switch"; // قد يكون الاستيراد خطأً، لكننا نحتفظ به كما هو
 import { Switch } from "@/components/ui/switch";
 
@@ -15,14 +20,19 @@ export default function SettingsPage() {
 
   return (
     <>
-      <Topbar title="Settings" subtitle="Configure how the agent behaves and exports data." />
+      <Topbar
+        title="Settings"
+        subtitle="Configure how the agent behaves and exports data."
+      />
 
       <main className="p-6 max-w-2xl mx-auto space-y-4">
         <Card>
           <CardHeader>
             <div>
               <CardTitle>Appearance</CardTitle>
-              <CardDescription>Currently only dark mode is fully supported</CardDescription>
+              <CardDescription>
+                Currently only dark mode is fully supported
+              </CardDescription>
             </div>
           </CardHeader>
           <Row label="Theme">
@@ -51,7 +61,9 @@ export default function SettingsPage() {
           <CardHeader>
             <div>
               <CardTitle>Cleaning defaults</CardTitle>
-              <CardDescription>Applied to every new dataset you upload</CardDescription>
+              <CardDescription>
+                Applied to every new dataset you upload
+              </CardDescription>
             </div>
           </CardHeader>
           <Row label="Default export format">
@@ -65,7 +77,11 @@ export default function SettingsPage() {
             />
           </Row>
           <Row label="Auto-save cleaned files to history">
-            <Switch checked={autoSave} onChange={setAutoSave} label="Auto save" />
+            <Switch
+              checked={autoSave}
+              onChange={setAutoSave}
+              label="Auto save"
+            />
           </Row>
         </Card>
 
@@ -73,11 +89,17 @@ export default function SettingsPage() {
           <CardHeader>
             <div>
               <CardTitle>Notifications</CardTitle>
-              <CardDescription>Get notified when a cleaning job finishes</CardDescription>
+              <CardDescription>
+                Get notified when a cleaning job finishes
+              </CardDescription>
             </div>
           </CardHeader>
           <Row label="Enable notifications">
-            <Switch checked={notifications} onChange={setNotifications} label="Notifications" />
+            <Switch
+              checked={notifications}
+              onChange={setNotifications}
+              label="Notifications"
+            />
           </Row>
         </Card>
       </main>
@@ -85,7 +107,13 @@ export default function SettingsPage() {
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-center justify-between py-3 border-t border-white/[0.05] first:border-t-0 first:pt-0">
       <span className="text-sm text-ink-100">{label}</span>
@@ -95,4 +123,4 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 // ✅ منع التصيير الثابت (Static Prerendering) لحل مشكلة useAuth
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";

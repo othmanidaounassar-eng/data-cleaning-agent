@@ -29,7 +29,7 @@ export function Dropzone({
       const file = e.dataTransfer.files?.[0];
       if (file) onFile(file);
     },
-    [onFile]
+    [onFile],
   );
 
   return (
@@ -47,7 +47,7 @@ export function Dropzone({
           "group relative flex flex-col items-center justify-center gap-3 rounded-xl2 border-2 border-dashed px-6 py-16 text-center cursor-pointer transition-colors duration-200",
           dragActive
             ? "border-accent-blue bg-accent-blue/[0.06]"
-            : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.03]"
+            : "border-white/10 bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.03]",
         )}
       >
         <input
@@ -65,7 +65,7 @@ export function Dropzone({
         <div
           className={cn(
             "flex h-14 w-14 items-center justify-center rounded-2xl bg-grad-primary transition-transform duration-200",
-            dragActive ? "scale-110" : "group-hover:scale-105"
+            dragActive ? "scale-110" : "group-hover:scale-105",
           )}
         >
           <UploadCloud className="h-6 w-6 text-white" />
@@ -76,7 +76,8 @@ export function Dropzone({
             Drag &amp; drop your dataset
           </p>
           <p className="text-sm text-ink-500 mt-1">
-            or <span className="text-accent-blue">browse files</span> from your computer
+            or <span className="text-accent-blue">browse files</span> from your
+            computer
           </p>
         </div>
 
@@ -90,10 +91,16 @@ export function Dropzone({
         <div className="mt-4 flex gap-3 rounded-xl2 border border-signal-bad/25 bg-signal-bad/[0.06] p-4">
           <FileWarning className="h-5 w-5 shrink-0 text-signal-bad" />
           <div>
-            <p className="text-sm font-medium text-signal-bad">{validationError.errorTitle}</p>
-            <p className="text-sm text-ink-300 mt-0.5">{validationError.errorMessage}</p>
+            <p className="text-sm font-medium text-signal-bad">
+              {validationError.errorTitle}
+            </p>
+            <p className="text-sm text-ink-300 mt-0.5">
+              {validationError.errorMessage}
+            </p>
             {validationError.suggestion && (
-              <p className="text-xs text-ink-500 mt-1.5">{validationError.suggestion}</p>
+              <p className="text-xs text-ink-500 mt-1.5">
+                {validationError.suggestion}
+              </p>
             )}
           </div>
         </div>

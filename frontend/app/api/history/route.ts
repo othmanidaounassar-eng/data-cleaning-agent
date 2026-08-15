@@ -5,5 +5,8 @@ import { NextResponse } from "next/server";
  * Today, history lives in the browser's localStorage.
  */
 export async function GET() {
-  return NextResponse.json({ status: "not_implemented", history: [] }, { status: 501 });
+  return NextResponse.json(
+    { status: "not_implemented", history: [] },
+    { status: 501 },
+  );
 }

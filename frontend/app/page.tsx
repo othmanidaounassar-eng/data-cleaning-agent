@@ -47,13 +47,17 @@ export default function UploadPage() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-white">Upload & Clean</h1>
-          <Link href="/" className="text-orange-500 hover:underline">← Back Home</Link>
+          <Link href="/" className="text-orange-500 hover:underline">
+            ← Back Home
+          </Link>
         </div>
 
         <div className="bg-dark-blue-800 p-8 rounded-lg border border-orange-500/20">
           <div className="border-2 border-dashed border-orange-500/40 rounded-lg p-12 text-center">
             <UploadCloud className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-            <p className="text-white text-lg mb-2">Drag & drop your file here</p>
+            <p className="text-white text-lg mb-2">
+              Drag & drop your file here
+            </p>
             <p className="text-white/60 text-sm mb-4">or click to browse</p>
             <input
               type="file"
@@ -69,7 +73,9 @@ export default function UploadPage() {
               Choose File
             </label>
             {file && (
-              <p className="text-white/80 mt-4">Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)</p>
+              <p className="text-white/80 mt-4">
+                Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+              </p>
             )}
           </div>
 
@@ -89,7 +95,9 @@ export default function UploadPage() {
 
           {result && (
             <div className="mt-8 bg-dark-blue-900 p-6 rounded-lg border border-orange-500/20">
-              <h2 className="text-xl font-bold text-white mb-4">Cleaning Report</h2>
+              <h2 className="text-xl font-bold text-white mb-4">
+                Cleaning Report
+              </h2>
               <div className="grid grid-cols-2 gap-4 text-white/80">
                 <div>Rows Before: {result.rows_before}</div>
                 <div>Rows After: {result.rows_after}</div>

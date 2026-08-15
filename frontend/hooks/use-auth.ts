@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { mockAuthService } from "@/lib/auth/mock-service";
-import { AuthError, AuthSession, LoginInput, RegisterInput } from "@/lib/auth/types";
+import {
+  AuthError,
+  AuthSession,
+  LoginInput,
+  RegisterInput,
+} from "@/lib/auth/types";
 
 const SESSION_KEY = "ai-data-cleaning-agent:session";
 
@@ -46,7 +51,9 @@ export function useAuth() {
       return result;
     } catch (err) {
       const authError =
-        err instanceof AuthError ? err : new AuthError("Could not sign in. Please try again.");
+        err instanceof AuthError
+          ? err
+          : new AuthError("Could not sign in. Please try again.");
       setError(authError);
       throw authError;
     } finally {
@@ -64,7 +71,9 @@ export function useAuth() {
       return result;
     } catch (err) {
       const authError =
-        err instanceof AuthError ? err : new AuthError("Could not create your account. Please try again.");
+        err instanceof AuthError
+          ? err
+          : new AuthError("Could not create your account. Please try again.");
       setError(authError);
       throw authError;
     } finally {
@@ -78,7 +87,10 @@ export function useAuth() {
     try {
       return await mockAuthService.requestPasswordReset(email);
     } catch (err) {
-      const authError = err instanceof AuthError ? err : new AuthError("Could not send reset link.");
+      const authError =
+        err instanceof AuthError
+          ? err
+          : new AuthError("Could not send reset link.");
       setError(authError);
       throw authError;
     } finally {
@@ -92,7 +104,10 @@ export function useAuth() {
     try {
       return await mockAuthService.resendVerificationEmail(email);
     } catch (err) {
-      const authError = err instanceof AuthError ? err : new AuthError("Could not resend the email.");
+      const authError =
+        err instanceof AuthError
+          ? err
+          : new AuthError("Could not resend the email.");
       setError(authError);
       throw authError;
     } finally {

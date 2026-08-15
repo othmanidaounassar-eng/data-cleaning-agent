@@ -15,7 +15,7 @@ function triggerDownload(blob: Blob, filename: string) {
 export function downloadCleanedCsv(
   headers: string[],
   rows: Record<string, unknown>[],
-  filename: string
+  filename: string,
 ) {
   const escape = (value: unknown) => {
     if (value === null || value === undefined) return "";
@@ -28,7 +28,9 @@ export function downloadCleanedCsv(
     ...rows.map((row) => headers.map((h) => escape(row[h])).join(",")),
   ];
 
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
   triggerDownload(blob, filename);
 }
 
@@ -36,7 +38,10 @@ export function downloadJsonReport(report: CleaningReport) {
   const blob = new Blob([JSON.stringify(report, null, 2)], {
     type: "application/json",
   });
-  triggerDownload(blob, report.fileName.replace(/\.(csv|xlsx|xls)$/i, "_report.json"));
+  triggerDownload(
+    blob,
+    report.fileName.replace(/\.(csv|xlsx|xls)$/i, "_report.json"),
+  );
 }
 
 export function downloadCsvReport(report: CleaningReport) {
@@ -56,8 +61,13 @@ export function downloadCsvReport(report: CleaningReport) {
     `Processing Time (ms),${report.stats.processingTimeMs}`,
     `Quality Score,${report.stats.qualityScore}`,
   ];
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  triggerDownload(blob, report.fileName.replace(/\.(csv|xlsx|xls)$/i, "_report.csv"));
+  const blob = new Blob([lines.join("\n")], {
+    type: "text/csv;charset=utf-8;",
+  });
+  triggerDownload(
+    blob,
+    report.fileName.replace(/\.(csv|xlsx|xls)$/i, "_report.csv"),
+  );
 }
 
 export function downloadPdfReport(report: CleaningReport) {
@@ -73,7 +83,11 @@ export function downloadPdfReport(report: CleaningReport) {
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
   doc.setTextColor(90);
-  doc.text(`${report.fileName}  •  ${new Date(report.cleaningDate).toLocaleString()}`, marginX, y);
+  doc.text(
+    `${report.fileName}  •  ${new Date(report.cleaningDate).toLocaleString()}`,
+    marginX,
+    y,
+  );
 
   y += 12;
   doc.setTextColor(20);

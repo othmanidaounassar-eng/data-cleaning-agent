@@ -4,8 +4,6 @@
 @tailwind utilities;
 /* stylelint-enable at-rule-no-unknown */
 
-
-
 :root {
   color-scheme: dark;
 }
@@ -20,12 +18,16 @@
   }
 
   body {
-    background-color: #0A192F; /* dark-blue-900 */
+    background-color: #0a192f; /* dark-blue-900 */
     color: #ffffff;
-    font-family: 'Inter', sans-serif;
+    font-family: "Inter", sans-serif;
     -webkit-font-smoothing: antialiased;
-    background-image:
-      radial-gradient(60% 50% at 50% -10%, rgba(249, 115, 22, 0.15) 0%, rgba(10, 25, 47, 0.8) 45%, rgba(7, 9, 15, 0) 80%);
+    background-image: radial-gradient(
+      60% 50% at 50% -10%,
+      rgba(249, 115, 22, 0.15) 0%,
+      rgba(10, 25, 47, 0.8) 45%,
+      rgba(7, 9, 15, 0) 80%
+    );
     background-repeat: no-repeat;
   }
 
@@ -34,7 +36,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid #F97316;
+    outline: 2px solid #f97316;
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -51,7 +53,7 @@
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #1E3A8A;
+    background: #1e3a8a;
   }
 }
 
@@ -71,7 +73,7 @@
   }
 
   .text-gradient {
-    background: linear-gradient(to right, #F97316, #EA580C);
+    background: linear-gradient(to right, #f97316, #ea580c);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -102,7 +104,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

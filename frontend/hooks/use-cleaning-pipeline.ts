@@ -8,9 +8,17 @@ import {
   ValidationResult,
   CleaningReport,
 } from "@/lib/types";
-import { getFileKind, validateFileBasics, validateParsedData } from "@/lib/validate-file";
+import {
+  getFileKind,
+  validateFileBasics,
+  validateParsedData,
+} from "@/lib/validate-file";
 import { parseFile } from "@/lib/parse-file";
-import { uploadDatasetToBackend, ApiError, apiErrorTitle } from "@/lib/api-client";
+import {
+  uploadDatasetToBackend,
+  ApiError,
+  apiErrorTitle,
+} from "@/lib/api-client";
 import { adaptBackendReport } from "@/lib/adapt-backend-report";
 import { addHistoryEntry } from "@/lib/history-store";
 import { uid } from "@/lib/utils";
@@ -31,7 +39,8 @@ const STEP_DEFS: { id: PipelineStepId; label: string }[] = [
 // visualization stays honest about what's actually happening.
 const PROGRESS_STEP_COUNT = STEP_DEFS.length - 1;
 
-export type Phase = "idle" | "validating" | "invalid" | "uploading" | "error" | "done";
+export type Phase =
+  "idle" | "validating" | "invalid" | "uploading" | "error" | "done";
 
 export interface UploadErrorInfo {
   title: string;
@@ -44,7 +53,7 @@ export function useCleaningPipeline() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [datasetInfo, setDatasetInfo] = useState<DatasetInfo | null>(null);
   const [steps, setSteps] = useState<PipelineStep[]>(
-    STEP_DEFS.map((s) => ({ ...s, status: "waiting" as const }))
+    STEP_DEFS.map((s) => ({ ...s, status: "waiting" as const })),
   );
   const [uploadProgress, setUploadProgress] = useState(0);
   const [report, setReport] = useState<CleaningReport | null>(null);
@@ -56,7 +65,7 @@ export function useCleaningPipeline() {
   const setStepsFromProgress = useCallback((percent: number) => {
     const completedCount = Math.min(
       PROGRESS_STEP_COUNT,
-      Math.floor((percent / 100) * PROGRESS_STEP_COUNT)
+      Math.floor((percent / 100) * PROGRESS_STEP_COUNT),
     );
     setSteps((prev) =>
       prev.map((s, i) => {
@@ -64,7 +73,7 @@ export function useCleaningPipeline() {
         if (i < completedCount) return { ...s, status: "completed" };
         if (i === completedCount) return { ...s, status: "running" };
         return { ...s, status: "waiting" };
-      })
+      }),
     );
   }, []);
 
@@ -99,13 +108,15 @@ export function useCleaningPipeline() {
           prev.map((s) =>
             s.id === "finalReport"
               ? { ...s, status: "running" }
-              : { ...s, status: "completed" }
-          )
+              : { ...s, status: "completed" },
+          ),
         );
 
         const adapted = adaptBackendReport(raw, file.name);
 
-        setSteps((prev) => prev.map((s) => ({ ...s, status: "completed" as const })));
+        setSteps((prev) =>
+          prev.map((s) => ({ ...s, status: "completed" as const })),
+        );
         setReport(adapted);
 
         addHistoryEntry({
@@ -123,7 +134,9 @@ export function useCleaningPipeline() {
         setPhase("done");
       } catch (err) {
         setSteps((prev) =>
-          prev.map((s) => (s.status === "running" ? { ...s, status: "error" } : s))
+          prev.map((s) =>
+            s.status === "running" ? { ...s, status: "error" } : s,
+          ),
         );
 
         if (err instanceof ApiError) {
@@ -131,18 +144,25 @@ export function useCleaningPipeline() {
             setPhase("idle");
             return;
           }
-          setUploadError({ title: apiErrorTitle(err.kind), message: err.message, kind: err.kind });
+          setUploadError({
+            title: apiErrorTitle(err.kind),
+            message: err.message,
+            kind: err.kind,
+          });
         } else {
           setUploadError({
             title: "Unexpected Error",
-            message: err instanceof Error ? err.message : "Something went wrong during upload.",
+            message:
+              err instanceof Error
+                ? err.message
+                : "Something went wrong during upload.",
             kind: "server",
           });
         }
         setPhase("error");
       }
     },
-    [setStepsFromProgress]
+    [setStepsFromProgress],
   );
 
   const processFile = useCallback(
@@ -168,7 +188,7 @@ export function useCleaningPipeline() {
           parsed.headers,
           parsed.rows.length,
           parsed.encoding,
-          basics.checks
+          basics.checks,
         );
         setValidation(fullValidation);
 
@@ -202,7 +222,7 @@ export function useCleaningPipeline() {
 
       await runUpload(file);
     },
-    [reset, runUpload]
+    [reset, runUpload],
   );
 
   const retry = useCallback(() => {

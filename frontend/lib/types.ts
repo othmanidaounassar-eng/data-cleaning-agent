@@ -3,12 +3,7 @@
 export type FileKind = "csv" | "xlsx" | "xls";
 
 export type ValidationCheckId =
-  | "extension"
-  | "size"
-  | "empty"
-  | "headers"
-  | "duplicateHeaders"
-  | "encoding";
+  "extension" | "size" | "empty" | "headers" | "duplicateHeaders" | "encoding";
 
 export interface ValidationCheck {
   id: ValidationCheckId;
@@ -84,8 +79,8 @@ export interface CleaningReport {
   summary?: string;
   processing_time_s?: number;
   // ✅ حقول جديدة من Backend
-  download_url?: string;          // رابط التحميل (Base64)
-  cleaned_file_name?: string;     // اسم الملف المنظف
+  download_url?: string; // رابط التحميل (Base64)
+  cleaned_file_name?: string; // اسم الملف المنظف
 }
 
 export interface HistoryEntry {

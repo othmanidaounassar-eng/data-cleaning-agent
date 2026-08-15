@@ -24,7 +24,9 @@ export function validateFileBasics(file: File): ValidationResult {
     id: "extension",
     label: "File Type",
     passed: extensionOk,
-    detail: extensionOk ? `${kind?.toUpperCase()} file detected` : "Unsupported extension",
+    detail: extensionOk
+      ? `${kind?.toUpperCase()} file detected`
+      : "Unsupported extension",
   });
 
   if (!extensionOk) {
@@ -32,7 +34,8 @@ export function validateFileBasics(file: File): ValidationResult {
       valid: false,
       checks,
       errorTitle: "Unsupported File Type",
-      errorMessage: "Only CSV and Excel files (.csv, .xlsx, .xls) are supported.",
+      errorMessage:
+        "Only CSV and Excel files (.csv, .xlsx, .xls) are supported.",
       suggestion: "Export your dataset as CSV or Excel and upload it again.",
     };
   }
@@ -46,8 +49,8 @@ export function validateFileBasics(file: File): ValidationResult {
       file.size === 0
         ? "File is empty"
         : file.size > MAX_SIZE_BYTES
-        ? "File exceeds the 50 MB limit"
-        : "Within size limits",
+          ? "File exceeds the 50 MB limit"
+          : "Within size limits",
   });
 
   if (file.size === 0) {
@@ -66,7 +69,8 @@ export function validateFileBasics(file: File): ValidationResult {
       checks,
       errorTitle: "File Too Large",
       errorMessage: `This file is larger than the ${DEFAULT_PLAN.maxUploadSizeMb} MB limit on the ${DEFAULT_PLAN.name} plan.`,
-      suggestion: "Try splitting the dataset, removing unused columns, or upgrading your plan.",
+      suggestion:
+        "Try splitting the dataset, removing unused columns, or upgrading your plan.",
     };
   }
 
@@ -80,16 +84,19 @@ export function validateParsedData(
   headers: string[],
   rowCount: number,
   encoding: string,
-  priorChecks: ValidationCheck[]
+  priorChecks: ValidationCheck[],
 ): ValidationResult {
   const checks = [...priorChecks];
 
-  const hasHeaders = headers.length > 0 && headers.some((h) => h.trim().length > 0);
+  const hasHeaders =
+    headers.length > 0 && headers.some((h) => h.trim().length > 0);
   checks.push({
     id: "headers",
     label: "Column Headers",
     passed: hasHeaders,
-    detail: hasHeaders ? `${headers.length} columns detected` : "No headers found",
+    detail: hasHeaders
+      ? `${headers.length} columns detected`
+      : "No headers found",
   });
 
   if (!hasHeaders) {
@@ -98,7 +105,8 @@ export function validateParsedData(
       checks,
       errorTitle: "Missing Column Headers",
       errorMessage: "The Agent couldn't find a header row in this file.",
-      suggestion: "Make sure the first row contains column names, then re-upload.",
+      suggestion:
+        "Make sure the first row contains column names, then re-upload.",
     };
   }
 
@@ -125,7 +133,8 @@ export function validateParsedData(
       checks,
       errorTitle: "Duplicate Column Names Found",
       errorMessage: `These columns appear more than once: ${Array.from(duplicates).join(", ")}.`,
-      suggestion: "Rename duplicate columns so every column name is unique, then re-upload.",
+      suggestion:
+        "Rename duplicate columns so every column name is unique, then re-upload.",
     };
   }
 
@@ -143,7 +152,8 @@ export function validateParsedData(
       checks,
       errorTitle: "No Data Rows Found",
       errorMessage: "This file only contains headers, with no data underneath.",
-      suggestion: "Please upload a dataset that includes at least one row of data.",
+      suggestion:
+        "Please upload a dataset that includes at least one row of data.",
     };
   }
 

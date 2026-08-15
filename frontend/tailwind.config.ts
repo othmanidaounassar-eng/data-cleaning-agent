@@ -47,7 +47,8 @@ const config: Config = {
       },
       boxShadow: {
         glass: "0 8px 32px rgba(4, 6, 12, 0.45)",
-        "glow-blue": "0 0 0 1px rgba(79,124,255,0.25), 0 0 24px rgba(79,124,255,0.25)",
+        "glow-blue":
+          "0 0 0 1px rgba(79,124,255,0.25), 0 0 24px rgba(79,124,255,0.25)",
       },
       borderRadius: {
         xl2: "1.25rem",

@@ -1,4 +1,10 @@
-import { AlertTriangle, RotateCcw, WifiOff, Clock, ServerCrash } from "lucide-react";
+import {
+  AlertTriangle,
+  RotateCcw,
+  WifiOff,
+  Clock,
+  ServerCrash,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ApiErrorKind } from "@/lib/api-client";

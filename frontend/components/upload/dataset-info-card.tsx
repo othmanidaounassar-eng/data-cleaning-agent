@@ -9,7 +9,9 @@ export function ValidationDashboard({ result }: { result: ValidationResult }) {
     <Card>
       <CardHeader>
         <CardTitle>Validation checks</CardTitle>
-        <Badge tone={result.valid ? "good" : "bad"}>{result.valid ? "Valid" : "Invalid"}</Badge>
+        <Badge tone={result.valid ? "good" : "bad"}>
+          {result.valid ? "Valid" : "Invalid"}
+        </Badge>
       </CardHeader>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {result.checks.map((check) => (
@@ -24,7 +26,9 @@ export function ValidationDashboard({ result }: { result: ValidationResult }) {
             )}
             <div className="min-w-0">
               <p className="text-xs font-medium text-ink-100">{check.label}</p>
-              <p className="text-[11px] text-ink-500 truncate">{check.detail}</p>
+              <p className="text-[11px] text-ink-500 truncate">
+                {check.detail}
+              </p>
             </div>
           </div>
         ))}
@@ -53,7 +57,9 @@ export function DatasetInfoCard({ info }: { info: DatasetInfo }) {
         {rows.map(([label, value]) => (
           <div key={label}>
             <dt className="text-[11px] text-ink-500">{label}</dt>
-            <dd className="text-sm font-mono text-ink-100 mt-0.5 truncate">{value}</dd>
+            <dd className="text-sm font-mono text-ink-100 mt-0.5 truncate">
+              {value}
+            </dd>
           </div>
         ))}
       </dl>

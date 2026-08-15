@@ -11,14 +11,20 @@ export interface CleaningOutcome {
 }
 
 function isBlank(value: unknown): boolean {
-  return value === null || value === undefined || (typeof value === "string" && value.trim() === "");
+  return (
+    value === null ||
+    value === undefined ||
+    (typeof value === "string" && value.trim() === "")
+  );
 }
 
 function median(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted.length % 2 !== 0
+    ? sorted[mid]
+    : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 function mode<T>(values: T[]): T | undefined {
@@ -38,7 +44,9 @@ function mode<T>(values: T[]): T | undefined {
 function detectColumnType(values: unknown[]): "numeric" | "text" {
   const present = values.filter((v) => !isBlank(v));
   if (present.length === 0) return "text";
-  const numericCount = present.filter((v) => typeof v === "number" || (!isNaN(Number(v)) && v !== "")).length;
+  const numericCount = present.filter(
+    (v) => typeof v === "number" || (!isNaN(Number(v)) && v !== ""),
+  ).length;
   return numericCount / present.length >= 0.8 ? "numeric" : "text";
 }
 
@@ -48,7 +56,7 @@ function detectColumnType(values: unknown[]): "numeric" | "text" {
  */
 export function cleanDataset(
   headers: string[],
-  inputRows: Record<string, unknown>[]
+  inputRows: Record<string, unknown>[],
 ): CleaningOutcome {
   let rows = inputRows.map((r) => ({ ...r }));
 
@@ -142,7 +150,9 @@ export function cleanDataset(
         const iqr = q3 - q1;
         const lower = q1 - 1.5 * iqr;
         const upper = q3 + 1.5 * iqr;
-        outliersDetected += numericValues.filter((v) => v < lower || v > upper).length;
+        outliersDetected += numericValues.filter(
+          (v) => v < lower || v > upper,
+        ).length;
       }
 
       columnsConverted++;
@@ -170,7 +180,8 @@ export function computeQualityScore(params: {
   rowsBefore: number;
   outliersDetected: number;
 }): number {
-  const { missingBefore, duplicatesRemoved, rowsBefore, outliersDetected } = params;
+  const { missingBefore, duplicatesRemoved, rowsBefore, outliersDetected } =
+    params;
   let score = 100;
   const totalCells = Math.max(rowsBefore, 1);
 

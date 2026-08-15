@@ -7,8 +7,7 @@ import { cn } from "@/lib/utils";
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "outline";
 type Size = "sm" | "md" | "lg" | "icon";
 
-export interface ButtonProps
-  extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: Variant;
   size?: Size;
   /** Shows a spinner and disables the button — for async submits / uploads. */
@@ -23,7 +22,8 @@ const variants: Record<Variant, string> = {
   outline:
     "bg-transparent border border-white/10 text-ink-100 hover:bg-white/5",
   ghost: "bg-transparent text-ink-300 hover:text-ink-100 hover:bg-white/5",
-  danger: "bg-signal-bad/15 text-signal-bad border border-signal-bad/30 hover:bg-signal-bad/25",
+  danger:
+    "bg-signal-bad/15 text-signal-bad border border-signal-bad/30 hover:bg-signal-bad/25",
 };
 
 const sizes: Record<Size, string> = {
@@ -34,7 +34,18 @@ const sizes: Record<Size, string> = {
 };
 
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", loading = false, disabled, children, ...props }, ref) => {
+  (
+    {
+      className,
+      variant = "primary",
+      size = "md",
+      loading = false,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
     return (
       <button
         ref={ref}
@@ -44,7 +55,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
           "inline-flex items-center justify-center font-medium transition-all duration-150 disabled:opacity-40 disabled:pointer-events-none select-none",
           variants[variant],
           sizes[size],
-          className
+          className,
         )}
         {...props}
       >
@@ -52,6 +63,6 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         {children}
       </button>
     );
-  }
+  },
 );
 Button.displayName = "Button";

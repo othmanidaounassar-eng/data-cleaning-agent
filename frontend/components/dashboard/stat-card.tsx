@@ -31,7 +31,7 @@ export function StatCard({
             "mt-1 text-[11px] font-medium",
             tone === "good" && "text-signal-good",
             tone === "warn" && "text-signal-warn",
-            tone === "neutral" && "text-ink-500"
+            tone === "neutral" && "text-ink-500",
           )}
         >
           {trend}

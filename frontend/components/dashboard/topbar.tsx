@@ -2,11 +2,19 @@
 
 import { Bell, Search } from "lucide-react";
 
-export function Topbar({ title, subtitle }: { title: string; subtitle?: string }) {
+export function Topbar({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
   return (
     <header className="flex items-center justify-between border-b border-white/[0.06] bg-base-950/70 px-6 py-4 backdrop-blur-xl sticky top-0 z-10">
       <div>
-        <h1 className="font-display text-lg font-semibold text-ink-100">{title}</h1>
+        <h1 className="font-display text-lg font-semibold text-ink-100">
+          {title}
+        </h1>
         {subtitle && <p className="text-xs text-ink-500 mt-0.5">{subtitle}</p>}
       </div>
 

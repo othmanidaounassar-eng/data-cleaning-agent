@@ -37,11 +37,31 @@ export function FilesProcessedChart({
             <stop offset="100%" stopColor="#4F7CFF" stopOpacity={0} />
           </linearGradient>
         </defs>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-        <XAxis dataKey="day" tick={{ fill: "#8891A5", fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#8891A5", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke="rgba(255,255,255,0.05)"
+          vertical={false}
+        />
+        <XAxis
+          dataKey="day"
+          tick={{ fill: "#8891A5", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: "#8891A5", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={28}
+        />
         <Tooltip contentStyle={tooltipStyle} />
-        <Area type="monotone" dataKey="files" stroke="#4F7CFF" strokeWidth={2} fill="url(#filesGradient)" />
+        <Area
+          type="monotone"
+          dataKey="files"
+          stroke="#4F7CFF"
+          strokeWidth={2}
+          fill="url(#filesGradient)"
+        />
       </AreaChart>
     </ResponsiveContainer>
   );
@@ -66,7 +86,11 @@ export function IssuesPieChart({
           paddingAngle={3}
         >
           {data.map((_, i) => (
-            <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} stroke="transparent" />
+            <Cell
+              key={i}
+              fill={PIE_COLORS[i % PIE_COLORS.length]}
+              stroke="transparent"
+            />
           ))}
         </Pie>
         <Tooltip contentStyle={tooltipStyle} />
@@ -83,12 +107,39 @@ export function CleaningVolumeBarChart({
   return (
     <ResponsiveContainer width="100%" height={220}>
       <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-        <XAxis dataKey="day" tick={{ fill: "#8891A5", fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#8891A5", fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
-        <Tooltip contentStyle={tooltipStyle} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-        <Bar dataKey="duplicates" stackId="a" fill="#4F7CFF" radius={[4, 4, 0, 0]} />
-        <Bar dataKey="missing" stackId="a" fill="#8B5CF6" radius={[4, 4, 0, 0]} />
+        <CartesianGrid
+          strokeDasharray="3 3"
+          stroke="rgba(255,255,255,0.05)"
+          vertical={false}
+        />
+        <XAxis
+          dataKey="day"
+          tick={{ fill: "#8891A5", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          tick={{ fill: "#8891A5", fontSize: 11 }}
+          axisLine={false}
+          tickLine={false}
+          width={28}
+        />
+        <Tooltip
+          contentStyle={tooltipStyle}
+          cursor={{ fill: "rgba(255,255,255,0.03)" }}
+        />
+        <Bar
+          dataKey="duplicates"
+          stackId="a"
+          fill="#4F7CFF"
+          radius={[4, 4, 0, 0]}
+        />
+        <Bar
+          dataKey="missing"
+          stackId="a"
+          fill="#8B5CF6"
+          radius={[4, 4, 0, 0]}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

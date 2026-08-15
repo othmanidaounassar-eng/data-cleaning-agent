@@ -1,7 +1,12 @@
 "use client";
 
 import { FileDown, FileJson, FileSpreadsheet, FileText } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CleaningReport } from "@/lib/types";
 import {
@@ -22,9 +27,11 @@ export function DownloadSection({
 }) {
   // دعم كلا التنسيقين: downloadUrl (قديم) و download_url (جديد)
   const downloadUrl = report.download_url || report.downloadUrl || "";
-  const cleanedFileName = report.cleaned_file_name || report.cleanedFileName || "cleaned_data.csv";
+  const cleanedFileName =
+    report.cleaned_file_name || report.cleanedFileName || "cleaned_data.csv";
 
-  const hasDownloadUrl = typeof downloadUrl === "string" && downloadUrl.trim() !== "";
+  const hasDownloadUrl =
+    typeof downloadUrl === "string" && downloadUrl.trim() !== "";
   const hasLocalRows = headers.length > 0 && rows.length > 0;
   const canDownloadDataset = hasDownloadUrl || hasLocalRows;
 

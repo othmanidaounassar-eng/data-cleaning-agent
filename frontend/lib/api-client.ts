@@ -1,6 +1,7 @@
-import { API_BASE } from './api';
+import { API_BASE } from "./api";
 
-export type ApiErrorKind = "network" | "timeout" | "server" | "parse" | "aborted";
+export type ApiErrorKind =
+  "network" | "timeout" | "server" | "parse" | "aborted";
 
 export class ApiError extends Error {
   kind: ApiErrorKind;
@@ -23,7 +24,7 @@ export interface UploadOptions {
 
 export function uploadDatasetToBackend(
   file: File,
-  { onProgress, signal }: UploadOptions = {}
+  { onProgress, signal }: UploadOptions = {},
 ): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -59,16 +60,31 @@ export function uploadDatasetToBackend(
       try {
         resolve(JSON.parse(xhr.responseText));
       } catch {
-        reject(new ApiError("parse", "The server response could not be read as JSON."));
+        reject(
+          new ApiError(
+            "parse",
+            "The server response could not be read as JSON.",
+          ),
+        );
       }
     };
 
     xhr.onerror = () => {
-      reject(new ApiError("network", `Could not reach the cleaning service at ${API_BASE}.`));
+      reject(
+        new ApiError(
+          "network",
+          `Could not reach the cleaning service at ${API_BASE}.`,
+        ),
+      );
     };
 
     xhr.ontimeout = () => {
-      reject(new ApiError("timeout", "The backend took too long to respond. Try a smaller file."));
+      reject(
+        new ApiError(
+          "timeout",
+          "The backend took too long to respond. Try a smaller file.",
+        ),
+      );
     };
 
     xhr.onabort = () => {

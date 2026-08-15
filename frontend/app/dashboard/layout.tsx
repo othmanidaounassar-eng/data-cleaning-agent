@@ -15,7 +15,10 @@ export default function DashboardLayout({
       {/* شريط تنقل مبسط (بدون مصادقة) */}
       <nav className="bg-dark-blue-800 border-b border-orange-500/30 px-6 py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-4">
-          <Link href="/" className="text-2xl font-bold text-orange-500 hover:text-orange-400 transition">
+          <Link
+            href="/"
+            className="text-2xl font-bold text-orange-500 hover:text-orange-400 transition"
+          >
             OQZARO
           </Link>
           <span className="text-sm text-gray-400 hidden sm:inline">
@@ -38,4 +41,4 @@ export default function DashboardLayout({
 }
 
 // ✅ منع التصيير الثابت (اختياري، يمكن حذفه)
-export const dynamic = 'force-dynamic';
+export const dynamic = "force-dynamic";

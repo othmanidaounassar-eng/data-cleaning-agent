@@ -11,6 +11,6 @@ export async function POST(req: NextRequest) {
       status: "not_implemented",
       message: "Server-side AI cleaning is not enabled yet.",
     },
-    { status: 501 }
+    { status: 501 },
   );
 }

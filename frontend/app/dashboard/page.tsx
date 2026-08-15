@@ -14,7 +14,8 @@ export default function DashboardPage() {
           Welcome back, {user?.full_name || "Guest"}! 👋
         </h1>
         <p className="text-white/70 mt-2">
-          Upload a CSV or Excel file to clean, or review your previous cleaning history.
+          Upload a CSV or Excel file to clean, or review your previous cleaning
+          history.
         </p>
       </div>
 
@@ -25,7 +26,9 @@ export default function DashboardPage() {
         >
           <FileUp className="w-8 h-8 text-orange-500" />
           <span className="font-medium text-white">Upload New File</span>
-          <span className="text-sm text-white/60">Start cleaning your data</span>
+          <span className="text-sm text-white/60">
+            Start cleaning your data
+          </span>
         </Link>
 
         <Link

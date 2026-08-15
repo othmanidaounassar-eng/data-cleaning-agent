@@ -48,13 +48,15 @@ export function Sidebar() {
                 "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
                 active
                   ? "bg-white/[0.06] text-ink-100"
-                  : "text-ink-500 hover:text-ink-100 hover:bg-white/[0.03]"
+                  : "text-ink-500 hover:text-ink-100 hover:bg-white/[0.03]",
               )}
             >
               <Icon
                 className={cn(
                   "h-4 w-4 shrink-0",
-                  active ? "text-accent-blue" : "text-ink-500 group-hover:text-ink-300"
+                  active
+                    ? "text-accent-blue"
+                    : "text-ink-500 group-hover:text-ink-300",
                 )}
               />
               {item.label}

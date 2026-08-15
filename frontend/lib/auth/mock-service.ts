@@ -1,4 +1,10 @@
-import { AuthError, AuthSession, LoginInput, RegisterInput, User } from "./types";
+import {
+  AuthError,
+  AuthSession,
+  LoginInput,
+  RegisterInput,
+  User,
+} from "./types";
 import { uid } from "../utils";
 
 const SIMULATED_LATENCY_MS = 700;
@@ -48,10 +54,16 @@ export const mockAuthService = {
       throw new AuthError("Passwords don't match.", "confirmPassword");
     }
     if (input.password.length < 8) {
-      throw new AuthError("Password must be at least 8 characters.", "password");
+      throw new AuthError(
+        "Password must be at least 8 characters.",
+        "password",
+      );
     }
     if (!input.acceptTerms) {
-      throw new AuthError("You must accept the Terms of Service to continue.", "acceptTerms");
+      throw new AuthError(
+        "You must accept the Terms of Service to continue.",
+        "acceptTerms",
+      );
     }
 
     const user: User = {

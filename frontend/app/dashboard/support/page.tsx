@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { LifeBuoy, Mail, MessageSquare, CheckCircle2 } from "lucide-react";
 import { Topbar } from "@/components/dashboard/topbar";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Input, Label } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 
@@ -12,14 +17,19 @@ export default function SupportPage() {
 
   return (
     <>
-      <Topbar title="Support" subtitle="We usually respond within a few hours." />
+      <Topbar
+        title="Support"
+        subtitle="We usually respond within a few hours."
+      />
 
       <main className="p-6 max-w-2xl mx-auto space-y-4">
         <Card>
           <CardHeader>
             <div>
               <CardTitle>Contact the team</CardTitle>
-              <CardDescription>Questions about cleaning results or your account</CardDescription>
+              <CardDescription>
+                Questions about cleaning results or your account
+              </CardDescription>
             </div>
             <LifeBuoy className="h-5 w-5 text-accent-blue" />
           </CardHeader>
@@ -27,7 +37,9 @@ export default function SupportPage() {
           {sent ? (
             <div className="flex items-center gap-2.5 rounded-xl border border-signal-good/25 bg-signal-good/[0.06] px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-signal-good" />
-              <p className="text-sm text-signal-good">Message sent — we&apos;ll get back to you soon.</p>
+              <p className="text-sm text-signal-good">
+                Message sent — we&apos;ll get back to you soon.
+              </p>
             </div>
           ) : (
             <form
@@ -39,7 +51,12 @@ export default function SupportPage() {
             >
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" required placeholder="you@company.com" />
+                <Input
+                  id="email"
+                  type="email"
+                  required
+                  placeholder="you@company.com"
+                />
               </div>
               <div>
                 <Label htmlFor="message">Message</Label>

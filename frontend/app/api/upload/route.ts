@@ -9,8 +9,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json(
     {
       status: "not_implemented",
-      message: "Server-side upload is not enabled yet. Files are processed in the browser.",
+      message:
+        "Server-side upload is not enabled yet. Files are processed in the browser.",
     },
-    { status: 501 }
+    { status: 501 },
   );
 }

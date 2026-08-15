@@ -15,10 +15,26 @@ export default function GlobalError({
 
   return (
     <html lang="en">
-      <body style={{ background: "#07090F", color: "#EDEFF5", fontFamily: "system-ui, sans-serif" }}>
-        <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <body
+        style={{
+          background: "#07090F",
+          color: "#EDEFF5",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        <div
+          style={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 24,
+          }}
+        >
           <div style={{ textAlign: "center", maxWidth: 360 }}>
-            <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>The app failed to load</h1>
+            <h1 style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+              The app failed to load
+            </h1>
             <p style={{ fontSize: 13, color: "#8891A5", marginBottom: 20 }}>
               A critical error occurred outside the normal error boundary.
             </p>

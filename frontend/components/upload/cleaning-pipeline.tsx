@@ -14,7 +14,12 @@ import {
   Check,
   X,
 } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { PipelineStep } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -87,10 +92,14 @@ export function CleaningPipeline({ steps }: { steps: PipelineStep[] }) {
               transition={{ delay: i * 0.03 }}
               className={cn(
                 "relative flex flex-col items-center gap-2 rounded-xl2 border px-3 py-4 text-center transition-colors duration-300",
-                step.status === "completed" && "border-signal-good/25 bg-signal-good/[0.05]",
-                step.status === "running" && "border-accent-blue/40 bg-accent-blue/[0.06]",
-                step.status === "error" && "border-signal-bad/30 bg-signal-bad/[0.06]",
-                step.status === "waiting" && "border-white/[0.05] bg-white/[0.02]"
+                step.status === "completed" &&
+                  "border-signal-good/25 bg-signal-good/[0.05]",
+                step.status === "running" &&
+                  "border-accent-blue/40 bg-accent-blue/[0.06]",
+                step.status === "error" &&
+                  "border-signal-bad/30 bg-signal-bad/[0.06]",
+                step.status === "waiting" &&
+                  "border-white/[0.05] bg-white/[0.02]",
               )}
             >
               <div
@@ -99,20 +108,32 @@ export function CleaningPipeline({ steps }: { steps: PipelineStep[] }) {
                   step.status === "completed" && "bg-signal-good/15",
                   step.status === "running" && "bg-accent-blue/15",
                   step.status === "error" && "bg-signal-bad/15",
-                  step.status === "waiting" && "bg-white/[0.04]"
+                  step.status === "waiting" && "bg-white/[0.04]",
                 )}
               >
                 <AnimatePresence mode="wait">
                   {step.status === "running" ? (
-                    <motion.div key="loader" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <motion.div
+                      key="loader"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
                       <Loader2 className="h-4 w-4 text-accent-blue animate-spin" />
                     </motion.div>
                   ) : step.status === "completed" ? (
-                    <motion.div key="check" initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                    <motion.div
+                      key="check"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                    >
                       <Check className="h-4 w-4 text-signal-good" />
                     </motion.div>
                   ) : step.status === "error" ? (
-                    <motion.div key="x" initial={{ scale: 0 }} animate={{ scale: 1 }}>
+                    <motion.div
+                      key="x"
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                    >
                       <X className="h-4 w-4 text-signal-bad" />
                     </motion.div>
                   ) : (
@@ -123,7 +144,7 @@ export function CleaningPipeline({ steps }: { steps: PipelineStep[] }) {
               <span
                 className={cn(
                   "text-[11px] font-medium leading-tight",
-                  step.status === "waiting" ? "text-ink-500" : "text-ink-100"
+                  step.status === "waiting" ? "text-ink-500" : "text-ink-100",
                 )}
               >
                 {step.label}
