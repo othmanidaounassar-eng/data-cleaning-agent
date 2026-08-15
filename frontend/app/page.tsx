@@ -1,127 +1,128 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { UploadCloud, Download, FileText } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+import { Sparkles, BarChart3, FileSpreadsheet, Upload, Brain, FileText } from "lucide-react";
 
-export default function UploadPage() {
-  const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState("");
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file) return;
-    setLoading(true);
-    setError("");
-    setResult(null);
-
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch(`${API_BASE}/clean`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Upload failed");
-      setResult(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-dark-blue-900 p-6">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Upload & Clean</h1>
-          <Link href="/" className="text-orange-500 hover:underline">
-            ← Back Home
+    <div className="min-h-screen bg-dark-blue-900">
+      {/* Navbar */}
+      <nav className="bg-dark-blue-800 px-6 py-4 flex justify-between items-center border-b border-orange-500/30">
+        <div className="flex items-center gap-3">
+          <span className="text-3xl font-bold text-orange-500">O</span>
+          <span className="text-2xl font-bold text-white">QZARO</span>
+          <span className="text-sm text-white opacity-80 hidden sm:inline">DataCleaning</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <Link href="/login">
+            <button className="bg-orange-500 hover:bg-orange-600 text-white px-5 py-2 rounded-md transition">
+              Log In
+            </button>
+          </Link>
+          <Link href="/register">
+            <button className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 px-5 py-2 rounded-md transition">
+              Sign Up
+            </button>
           </Link>
         </div>
+      </nav>
 
-        <div className="bg-dark-blue-800 p-8 rounded-lg border border-orange-500/20">
-          <div className="border-2 border-dashed border-orange-500/40 rounded-lg p-12 text-center">
-            <UploadCloud className="w-16 h-16 text-orange-500 mx-auto mb-4" />
-            <p className="text-white text-lg mb-2">
-              Drag & drop your file here
-            </p>
-            <p className="text-white/60 text-sm mb-4">or click to browse</p>
-            <input
-              type="file"
-              id="fileInput"
-              className="hidden"
-              onChange={handleFileChange}
-              accept=".csv,.xlsx,.xls"
-            />
-            <label
-              htmlFor="fileInput"
-              className="bg-orange-500 hover:bg-orange-600 text-white px-6 py-2 rounded-lg cursor-pointer transition inline-block"
-            >
-              Choose File
-            </label>
-            {file && (
-              <p className="text-white/80 mt-4">
-                Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-              </p>
-            )}
-          </div>
-
-          <button
-            onClick={handleUpload}
-            disabled={!file || loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg mt-6 transition"
-          >
-            {loading ? "Cleaning..." : "Upload & Clean"}
-          </button>
-
-          {error && (
-            <div className="bg-red-500/10 text-red-400 p-4 rounded-lg mt-6 border border-red-500/20">
-              {error}
-            </div>
-          )}
-
-          {result && (
-            <div className="mt-8 bg-dark-blue-900 p-6 rounded-lg border border-orange-500/20">
-              <h2 className="text-xl font-bold text-white mb-4">
-                Cleaning Report
-              </h2>
-              <div className="grid grid-cols-2 gap-4 text-white/80">
-                <div>Rows Before: {result.rows_before}</div>
-                <div>Rows After: {result.rows_after}</div>
-                <div>Duplicates Removed: {result.duplicates_removed}</div>
-                <div>Missing Values Filled: {result.missing_values_filled}</div>
-              </div>
-              {result.download_url && (
-                <div className="mt-6 flex gap-4">
-                  <a
-                    href={result.download_url}
-                    download
-                    className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition"
-                  >
-                    <Download className="w-4 h-4" /> Download Cleaned File
-                  </a>
-                  <button className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 px-4 py-2 rounded-lg flex items-center gap-2 transition">
-                    <FileText className="w-4 h-4" /> Download Report
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+      {/* Hero Section */}
+      <section className="flex flex-col items-center justify-center text-center px-4 py-20 max-w-4xl mx-auto">
+        <div className="w-24 h-24 rounded-full bg-orange-500/20 border-2 border-orange-500 flex items-center justify-center mb-6">
+          <span className="text-5xl font-bold text-orange-500">O</span>
         </div>
-      </div>
+        <h1 className="text-4xl md:text-6xl font-bold text-white">
+          Smart <span className="text-orange-500">Data Cleaning</span> Agent
+        </h1>
+        <p className="text-white text-lg mt-4 max-w-2xl opacity-90">
+          Upload your CSV or Excel file and let AI clean your data in seconds.
+        </p>
+        <div className="flex flex-wrap gap-4 mt-6">
+          <Link href="/upload">
+            <button className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg text-lg font-semibold transition">
+              Get Started
+            </button>
+          </Link>
+          <button className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 px-8 py-3 rounded-lg text-lg transition">
+            Learn More
+          </button>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="px-4 py-16 max-w-6xl mx-auto">
+        <h2 className="text-3xl font-bold text-center text-white mb-12">Features</h2>
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="bg-dark-blue-800 p-6 rounded-lg border border-orange-500/20 text-center">
+            <Sparkles className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+            <h3 className="text-xl font-semibold text-white">Automatic Cleaning</h3>
+            <p className="text-white opacity-80">Remove duplicates, fill missing values, and clean text.</p>
+          </div>
+          <div className="bg-dark-blue-800 p-6 rounded-lg border border-orange-500/20 text-center">
+            <BarChart3 className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+            <h3 className="text-xl font-semibold text-white">Advanced Analytics</h3>
+            <p className="text-white opacity-80">Get detailed statistics and insights about your data.</p>
+          </div>
+          <div className="bg-dark-blue-800 p-6 rounded-lg border border-orange-500/20 text-center">
+            <FileSpreadsheet className="w-10 h-10 text-orange-500 mx-auto mb-3" />
+            <h3 className="text-xl font-semibold text-white">Export Reports</h3>
+            <p className="text-white opacity-80">Download cleaned data and reports in multiple formats.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="px-4 py-16 max-w-5xl mx-auto">
+        <h2 className="text-3xl font-bold text-center text-white mb-12">How OQZARO DataCleaning Works</h2>
+        <div className="grid md:grid-cols-4 gap-6">
+          <div className="text-center">
+            <div className="bg-dark-blue-800 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto border border-orange-500/30">
+              <Upload className="w-8 h-8 text-orange-500" />
+            </div>
+            <p className="text-white mt-3 font-medium">1. Upload</p>
+            <p className="text-white opacity-80 text-sm">Your CSV or Excel file</p>
+          </div>
+          <div className="text-center">
+            <div className="bg-dark-blue-800 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto border border-orange-500/30">
+              <Sparkles className="w-8 h-8 text-orange-500" />
+            </div>
+            <p className="text-white mt-3 font-medium">2. Clean</p>
+            <p className="text-white opacity-80 text-sm">AI removes errors</p>
+          </div>
+          <div className="text-center">
+            <div className="bg-dark-blue-800 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto border border-orange-500/30">
+              <Brain className="w-8 h-8 text-orange-500" />
+            </div>
+            <p className="text-white mt-3 font-medium">3. Analyze</p>
+            <p className="text-white opacity-80 text-sm">Smart insights</p>
+          </div>
+          <div className="text-center">
+            <div className="bg-dark-blue-800 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto border border-orange-500/30">
+              <FileText className="w-8 h-8 text-orange-500" />
+            </div>
+            <p className="text-white mt-3 font-medium">4. Export</p>
+            <p className="text-white opacity-80 text-sm">Reports & cleaned file</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-dark-blue-800 px-6 py-8 border-t border-orange-500/20 text-center">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold text-orange-500">O</span>
+            <span className="text-xl font-bold text-white">QZARO</span>
+            <span className="text-sm text-white opacity-80">DataCleaning</span>
+          </div>
+          <div className="flex gap-6">
+            <a href="#" className="text-white hover:text-orange-500 transition">About</a>
+            <a href="#" className="text-white hover:text-orange-500 transition">Privacy</a>
+            <a href="#" className="text-white hover:text-orange-500 transition">Contact</a>
+          </div>
+          <div className="text-white opacity-80">© 2026 OQZARO. All rights reserved.</div>
+        </div>
+      </footer>
     </div>
   );
 }
