@@ -1,47 +1,27 @@
+# backend/analyzer.py
+
+import pandas as pd
 
 
-def analyze_data(df):
+def analyze_data(df: pd.DataFrame) -> dict:
     """
-    Analyze dataset and return a summary dictionary.
+    تحليل البيانات وإرجاع إحصائيات أساسية.
     """
-
     if df is None or df.empty:
-        return {"status": "Empty Dataset"}
+        return {
+            "rows": 0,
+            "columns": 0,
+            "column_names": [],
+            "dtypes": {},
+            "missing_values": {},
+            "total_missing": 0,
+        }
 
-    analysis = {}
-
-    # Basic Information
-    analysis["rows"] = df.shape[0]
-    analysis["columns"] = df.shape[1]
-    analysis["memory_usage_mb"] = round(df.memory_usage(deep=True).sum() / 1024**2, 2)
-
-    # Data Types
-    analysis["numeric_columns"] = df.select_dtypes(include="number").columns.tolist()
-
-    analysis["text_columns"] = df.select_dtypes(include="object").columns.tolist()
-
-    analysis["datetime_columns"] = df.select_dtypes(include="datetime").columns.tolist()
-
-    # Missing Values
-    analysis["missing_values"] = df.isna().sum().to_dict()
-
-    analysis["total_missing"] = int(df.isna().sum().sum())
-
-    # Duplicate Rows
-    analysis["duplicate_rows"] = int(df.duplicated().sum())
-
-    # Unique Values
-    analysis["unique_values"] = df.nunique().to_dict()
-
-    # Constant Columns
-    constant_columns = []
-
-    for column in df.columns:
-
-        if df[column].nunique() <= 1:
-
-            constant_columns.append(column)
-
-    analysis["constant_columns"] = constant_columns
-
-    return analysis
+    return {
+        "rows": len(df),
+        "columns": len(df.columns),
+        "column_names": df.columns.tolist(),
+        "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
+        "missing_values": {col: int(df[col].isna().sum()) for col in df.columns},
+        "total_missing": int(df.isna().sum().sum()),
+    }

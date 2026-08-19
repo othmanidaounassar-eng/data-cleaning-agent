@@ -1,7 +1,7 @@
 import { FileKind, ValidationCheck, ValidationResult } from "./types";
 import { DEFAULT_PLAN } from "./billing/plans";
 
-const MAX_SIZE_BYTES = DEFAULT_PLAN.maxUploadSizeMb * 1024 * 1024; // 50 MB on the Free plan
+const MAX_SIZE_BYTES = DEFAULT_PLAN.maxUploadSizeMb * 1026 * 1026; // 50 MB on the Free plan
 const SUPPORTED: FileKind[] = ["csv", "xlsx", "xls"];
 
 export function getFileKind(fileName: string): FileKind | null {

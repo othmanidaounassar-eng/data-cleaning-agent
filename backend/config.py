@@ -1,7 +1,4 @@
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
@@ -14,13 +11,16 @@ for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, REPORT_FOLDER]:
 ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls"]
 
 # ============================================
-# CORS - السماح بالنطاقات المحددة فقط
+# CORS - يُفضل ضبطه عبر متغير البيئة CORS_ORIGINS
 # ============================================
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS", "https://data-cleaning-agent-woad.vercel.app"
-).split(",")
+# ✅ القيمة الاحتياطية "*" تسمح لأي نطاق مؤقتاً (آمن للتجربة)
+# ✅ في الإنتاج، اضبط CORS_ORIGINS في Railway Variables
+_raw_origins = os.getenv("CORS_ORIGINS", "*")
+
+# تنظيف القائمة (إزالة المسافات والشرطات المائلة الزائدة)
+CORS_ORIGINS = [origin.strip().rstrip("/") for origin in _raw_origins.split(",") if origin.strip()]
 
 # ============================================
-# قاعدة البيانات (اختياري، استخدمه إن أردت)
+# قاعدة البيانات (اختياري)
 # ============================================
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")

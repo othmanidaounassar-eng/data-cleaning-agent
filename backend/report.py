@@ -8,19 +8,16 @@ def convert_to_serializable(obj):
     Convert numpy/pandas types to Python native types for JSON serialization.
     Handles inf, -inf, and NaN by converting them to None.
     """
-    # Handle basic Python float with inf/nan
     if isinstance(obj, float):
         if math.isnan(obj) or math.isinf(obj):
             return None
         return obj
-    # Handle numpy numeric types
     elif isinstance(obj, (np.integer, np.int64, np.int32)):
         return int(obj)
     elif isinstance(obj, (np.floating, np.float64, np.float32)):
         if math.isnan(obj) or math.isinf(obj):
             return None
         return float(obj)
-    # Handle arrays and sequences
     elif isinstance(obj, np.ndarray):
         return [convert_to_serializable(item) for item in obj]
     elif isinstance(obj, pd.Series):
@@ -35,9 +32,7 @@ def convert_to_serializable(obj):
         return obj
 
 
-def generate_report(
-    before: dict, after: dict, cleaning_report: dict, execution_time: float
-) -> dict:
+def generate_report(before: dict, after: dict, cleaning_report: dict, execution_time: float) -> dict:
     """
     Generate a structured report from the cleaning process results.
     """
@@ -50,6 +45,11 @@ def generate_report(
     missing_values_filled = cleaning_report.get("missing_values_filled", 0)
 
     quality_score = cleaning_report.get("quality_score", 0)
+
+    # ✅ التأكد من أن execution_time قيمة صالحة (ليست inf أو NaN)
+    if not math.isfinite(execution_time):
+        execution_time = 0.0
+
     processing_time_s = round(execution_time, 2)
 
     report = {
