@@ -3,7 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import { UploadCloud, Download, FileText, Loader2 } from "lucide-react";
-import { API_BASE } from "@/lib/api";
+
+// ============================================
+// ✅ تعريف الرابط مباشرة (تجنب مشاكل الاستيراد)
+// ============================================
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  "https://data-cleaning-agent-ai-production.up.railway.app";
 
 // ============================================
 // ✅ تعريف الواجهة بدلاً من any
@@ -13,14 +19,13 @@ interface CleaningResult {
   rows_after: number;
   duplicates_removed: number;
   missing_values_filled: number;
-  download_url?: string; // قد لا يكون موجوداً في بعض الحالات
+  download_url?: string;
   cleaned_file_name?: string;
 }
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  // ✅ استخدام الواجهة المحددة بدلاً من any
   const [result, setResult] = useState<CleaningResult | null>(null);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
@@ -62,7 +67,6 @@ export default function UploadPage() {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", url, true);
 
-      // تتبع التقدم
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 100);
@@ -90,7 +94,6 @@ export default function UploadPage() {
             );
           }
         } else {
-          // محاولة قراءة الخطأ من الاستجابة
           let errorMsg = `Upload failed with status ${xhr.status}`;
           try {
             const errorData = JSON.parse(xhr.responseText);
@@ -98,7 +101,6 @@ export default function UploadPage() {
               errorMsg = errorData.detail;
             }
           } catch {
-            // إذا لم تكن JSON، نأخذ النص الخام
             errorMsg = `Server error: ${xhr.responseText.substring(0, 200)}`;
           }
           setError(errorMsg);
@@ -119,10 +121,9 @@ export default function UploadPage() {
         setLoading(false);
       };
 
-      xhr.timeout = 300000; // 5 دقائق
+      xhr.timeout = 300000;
       xhr.send(formData);
     } catch (err) {
-      // ✅ تم إزالة ": any" والتحقق من نوع الخطأ بطريقة آمنة
       console.error("❌ Unexpected error:", err);
       const errorMessage =
         err instanceof Error ? err.message : "An unexpected error occurred.";
@@ -134,7 +135,6 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-dark-blue-900 p-6">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold text-white">Upload & Clean</h1>
           <Link href="/" className="text-orange-500 hover:underline">
@@ -142,7 +142,6 @@ export default function UploadPage() {
           </Link>
         </div>
 
-        {/* Upload Area */}
         <div className="bg-dark-blue-800 p-8 rounded-lg border border-orange-500/20">
           <div className="border-2 border-dashed border-orange-500/40 rounded-lg p-12 text-center">
             <UploadCloud className="w-16 h-16 text-orange-500 mx-auto mb-4" />
@@ -170,7 +169,6 @@ export default function UploadPage() {
             )}
           </div>
 
-          {/* Progress Bar */}
           {loading && (
             <div className="mt-4">
               <div className="w-full bg-dark-blue-900 rounded-full h-2.5">
@@ -183,7 +181,6 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* Upload Button */}
           <button
             onClick={handleUpload}
             disabled={!file || loading}
@@ -199,7 +196,6 @@ export default function UploadPage() {
             )}
           </button>
 
-          {/* Error Display */}
           {error && (
             <div className="bg-red-500/10 text-red-400 p-4 rounded-lg mt-6 border border-red-500/20">
               <p className="font-semibold">Error</p>
@@ -207,7 +203,6 @@ export default function UploadPage() {
             </div>
           )}
 
-          {/* Results */}
           {result && (
             <div className="mt-8 bg-dark-blue-900 p-6 rounded-lg border border-orange-500/20">
               <h2 className="text-xl font-bold text-white mb-4">
@@ -233,7 +228,6 @@ export default function UploadPage() {
                   <button
                     className="border border-orange-500 text-orange-500 hover:bg-orange-500/10 px-4 py-2 rounded-lg flex items-center gap-2 transition"
                     onClick={() => {
-                      // تصدير التقرير كـ JSON (مؤقت)
                       const blob = new Blob([JSON.stringify(result, null, 2)], {
                         type: "application/json",
                       });
