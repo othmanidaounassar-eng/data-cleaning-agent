@@ -1,159 +1,154 @@
-import os
-import shutil
-import time
-import traceback
+# cspell:ignore OQZARO
+"""Main module for OQZARO DataCleaning Agent."""
+
 import base64
+import logging
+import os
+import time
+import uuid
 from io import BytesIO
-from typing import List, Dict, Any, Optional
 
 import pandas as pd
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
-# ✅ استيراد المتغيرات من config (تم إضافة هذا السطر)
-from config import UPLOAD_FOLDER, OUTPUT_FOLDER, ALLOWED_EXTENSIONS
+from config import ALLOWED_EXTENSIONS, CORS_ORIGINS, MAX_FILE_SIZE, UPLOAD_FOLDER
 
-from reader import read_data
-from analyzer import analyze_data
-from cleaner import clean_data
-from report import generate_report
-from exporter import save_output
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ============================================
-# 1. إنشاء تطبيق FastAPI
-# ============================================
 app = FastAPI(
     title="OQZARO DataCleaning Agent",
-    version="1.0",
-    description="Clean and analyze CSV/Excel files, with JSON API for automation.",
+    version="1.0.0",
+    description="Secure and reliable data cleaning service for CSV and Excel files.",
+    docs_url=None,
+    redoc_url=None,
 )
 
-# ============================================
-# 2. CORS (تم إصلاح التعارض)
-# ============================================
+# CORS middleware - uses CORS_ORIGINS from config (now ["*"])
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # نسمح لكل النطاقات مؤقتاً
-    allow_credentials=False,  # تم تعطيلها لأنها تتعارض مع allow_origins=["*"]
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["POST", "GET"],
+    allow_headers=["Content-Type", "Accept"],
+    expose_headers=["Content-Disposition"],
 )
 
-# ============================================
-# 3. إنشاء مجلدات التحميل
-# ============================================
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
 
-# ============================================
-# 4. دالة مساعدة: تحويل DataFrame إلى Base64
-# ============================================
-def dataframe_to_base64(df: pd.DataFrame) -> str:
-    buffer = BytesIO()
-    df.to_csv(buffer, index=False, encoding="utf-8-sig")
-    buffer.seek(0)
-    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+def _analyze_dataframe(df):
+    return {
+        "rows": len(df),
+        "columns": len(df.columns),
+        "nulls": int(df.isnull().sum().sum()),
+        "duplicates": int(df.duplicated().sum()),
+    }
 
 
-# ============================================
-# 5. نقطة تنظيف البيانات (رفع ملف)
-# ============================================
-@app.post("/clean")
-def clean_dataset(file: UploadFile = File(...)):
+def _clean_dataframe(df):
+    cleaned_df = df.drop_duplicates().ffill().bfill()
+    cleaning_report = {
+        "duplicates_removed": int(len(df) - len(cleaned_df)),
+        "missing_filled": int(df.isnull().sum().sum() - cleaned_df.isnull().sum().sum()),
+    }
+    return cleaned_df, cleaning_report
+
+
+def _build_report(before, after, cleaning_report, exec_time):
+    return {
+        "rows_before": before.get("rows", 0),
+        "rows_after": after.get("rows", 0),
+        "duplicates_removed": cleaning_report.get("duplicates_removed", 0),
+        "missing_values_filled": cleaning_report.get("missing_filled", 0),
+        "execution_time_seconds": round(exec_time, 2),
+    }
+
+
+def _read_uploaded_file(file):
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="Filename is missing")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        allowed = ", ".join(ALLOWED_EXTENSIONS)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Extension '{ext}' not allowed. Allowed: {allowed}",
+        )
+
+    content = file.file.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large (max 50 MB)")
+
+    try:
+        if ext == ".csv":
+            df = pd.read_csv(BytesIO(content), encoding="utf-8-sig")
+        elif ext == ".xlsx":
+            df = pd.read_excel(BytesIO(content), engine="openpyxl")
+        elif ext == ".xls":
+            df = pd.read_excel(BytesIO(content), engine="xlrd")
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type")
+    except Exception as error:
+        raise HTTPException(status_code=400, detail=f"Failed to read file: {str(error)}") from error
+
+    return df
+
+
+@app.post("/clean", status_code=status.HTTP_200_OK)
+async def clean_dataset(file: UploadFile = File(...)):
     start_time = time.time()
     try:
-        if file.filename is None:
-            raise HTTPException(400, "File name is missing.")
+        df = _read_uploaded_file(file)
 
-        filename = file.filename
+        before = _analyze_dataframe(df)
+        cleaned_df, cleaning_report = _clean_dataframe(df)
+        after = _analyze_dataframe(cleaned_df)
 
-        file_extension = os.path.splitext(filename)[1].lower()
-        if file_extension not in ALLOWED_EXTENSIONS:
-            raise HTTPException(400, f"File type not allowed. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
+        exec_time = time.time() - start_time
+        report = _build_report(before, after, cleaning_report, exec_time)
 
-        MAX_FILE_SIZE = 50 * 1024 * 1024
-        file.file.seek(0, 2)
-        file_size = file.file.tell()
-        file.file.seek(0)
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(413, "File too large. Maximum size is 50 MB.")
-
-        file_path = os.path.join(UPLOAD_FOLDER, filename)
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        df = read_data(file_path)
-        before = analyze_data(df)
-        cleaned_df, cleaning_report = clean_data(df)
-        after = analyze_data(cleaned_df)
-        _ = save_output(cleaned_df, OUTPUT_FOLDER, filename)
-
-        execution_time = time.time() - start_time
-        report = generate_report(before, after, cleaning_report, execution_time)
-
-        csv_bytes = dataframe_to_base64(cleaned_df)
-        report["download_url"] = f"data:text/csv;base64,{csv_bytes}"
-        report["cleaned_file_name"] = f"cleaned_{int(time.time())}.csv"
+        buffer = BytesIO()
+        cleaned_df.to_csv(buffer, index=False, encoding="utf-8-sig")
+        buffer.seek(0)
+        csv_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        report["download_url"] = f"data:text/csv;base64,{csv_base64}"
+        report["cleaned_file_name"] = f"cleaned_{uuid.uuid4().hex[:8]}.csv"
 
         return JSONResponse(content=report)
+
+    except HTTPException:
+        raise
     except Exception as error:
-        traceback.print_exc()
-        raise HTTPException(500, f"Error: {str(error)}")
+        logger.error("Unexpected error: %s", error, exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error") from error
 
 
-# ============================================
-# 6. نقطة تنظيف البيانات من JSON (للأتمتة)
-# ============================================
-class DataPayload(BaseModel):
-    data: List[Dict[str, Any]]
-    source: Optional[str] = "manual"
+@app.get("/", include_in_schema=False)
+async def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": int(time.time()),
+        "service": "OQZARO DataCleaning Agent",
+        "version": "1.0.0",
+    }
 
 
-@app.post("/clean-json")
-def clean_json(payload: DataPayload):
-    start_time = time.time()
-    try:
-        df = pd.DataFrame(payload.data)
-        if df.empty:
-            raise HTTPException(400, "No data provided.")
-
-        before = analyze_data(df)
-        cleaned_df, cleaning_report = clean_data(df)
-        after = analyze_data(cleaned_df)
-
-        execution_time = time.time() - start_time
-        report = generate_report(before, after, cleaning_report, execution_time)
-
-        return JSONResponse(
-            content={
-                "status": "success",
-                "report": report,
-                "cleaned_data": cleaned_df.to_dict(orient="records"),
-                "source": payload.source,
-                "execution_time": execution_time,
-            }
-        )
-    except Exception as error:
-        traceback.print_exc()
-        raise HTTPException(500, f"Error: {str(error)}")
+@app.exception_handler(HTTPException)
+async def http_exception_handler(_, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
 
-# ============================================
-# 7. نقطة الصحة (Health Check)
-# ============================================
-@app.get("/")
-def home():
-    return {"message": "OQZARO DataCleaning Agent is Running", "status": "healthy"}
-
-
-# ============================================
-# 8. تشغيل الخادم محلياً وعبر Railway (ديناميكي)
-# ============================================
-if __name__ == "__main__":
-    import uvicorn
-
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+@app.exception_handler(Exception)
+async def generic_exception_handler(_, exc):
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again later."},
+    )

@@ -1,22 +1,26 @@
-import pandas as pd
+# cspell:ignore OQZARO
+"""File reading utilities for OQZARO DataCleaning Agent."""
+
 import os
+import pandas as pd
 
 
-def read_data(file_path):
+def read_data(file_path: str) -> pd.DataFrame:  # type: ignore
     """
-    قراءة الملفات المختلفة وإرجاع DataFrame
+    Read data from CSV or Excel file.
+
+    Args:
+        file_path: Path to the input file.
+
+    Returns:
+        pandas.DataFrame: Loaded data.
     """
+    ext = os.path.splitext(file_path)[1].lower()
 
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(f"File not found: {file_path}")
-
-    extension = os.path.splitext(file_path)[1].lower()
-
-    if extension == ".csv":
-        return pd.read_csv(file_path)
-
-    elif extension in [".xlsx", ".xls"]:
-        return pd.read_excel(file_path)
-
+    if ext == ".csv":
+        return pd.read_csv(file_path, encoding="utf-8-sig")  # type: ignore
+    elif ext in [".xlsx", ".xls"]:
+        engine = "openpyxl" if ext == ".xlsx" else "xlrd"
+        return pd.read_excel(file_path, engine=engine)  # type: ignore
     else:
-        raise ValueError(f"Unsupported file type: {extension}")
+        raise ValueError(f"Unsupported file format: {ext}")

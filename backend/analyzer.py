@@ -1,27 +1,22 @@
-# backend/analyzer.py
+# cspell:ignore OQZARO
+"""Data analysis utilities for OQZARO DataCleaning Agent."""
 
 import pandas as pd
 
 
-def analyze_data(df: pd.DataFrame) -> dict:
+def analyze_data(df: pd.DataFrame) -> dict:  # type: ignore
     """
-    تحليل البيانات وإرجاع إحصائيات أساسية.
-    """
-    if df is None or df.empty:
-        return {
-            "rows": 0,
-            "columns": 0,
-            "column_names": [],
-            "dtypes": {},
-            "missing_values": {},
-            "total_missing": 0,
-        }
+    Perform basic statistical analysis on the dataframe.
 
+    Args:
+        df: Input pandas DataFrame.
+
+    Returns:
+        dict: Analysis results (rows, columns, nulls, duplicates).
+    """
     return {
         "rows": len(df),
         "columns": len(df.columns),
-        "column_names": df.columns.tolist(),
-        "dtypes": {col: str(dtype) for col, dtype in df.dtypes.items()},
-        "missing_values": {col: int(df[col].isna().sum()) for col in df.columns},
-        "total_missing": int(df.isna().sum().sum()),
+        "nulls": int(df.isnull().sum().sum()),
+        "duplicates": int(df.duplicated().sum()),
     }
