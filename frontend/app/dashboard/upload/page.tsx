@@ -3,13 +3,8 @@
 import { useState } from "react";
 import Link from "next/link";
 import { UploadCloud, Download, FileText, Loader2 } from "lucide-react";
-
-// ============================================
-// ✅ تعريف الرابط مباشرة (تجنب مشاكل الاستيراد)
-// ============================================
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  "https://data-cleaning-agent-ai-production.up.railway.app";
+// ✅ استيراد نقاط النهاية من lib/api
+import { API_ENDPOINTS } from "@/lib/api";
 
 // ============================================
 // ✅ تعريف الواجهة بدلاً من any
@@ -60,8 +55,9 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const url = `${API_BASE}/clean`;
-      console.log("🔍 Sending request to:", url);
+      // ✅ استخدام Proxy الداخلي بدلاً من الرابط المباشر
+      const url = API_ENDPOINTS.UPLOAD;
+      console.log("🔍 Sending request to proxy:", url);
       console.log("📁 File:", file.name, file.size, "bytes");
 
       const xhr = new XMLHttpRequest();
