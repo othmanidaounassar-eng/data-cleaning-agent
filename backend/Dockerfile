@@ -2,7 +2,6 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# 👇 هذا هو المسار الجديد الذي يجب إضافته (قبل نسخ المتطلبات)
 RUN apt-get update && apt-get install -y \
     tk \
     tk-dev \
@@ -13,4 +12,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port $PORT"]
+# ✅ تم التعديل هنا: استخدام المنفذ الثابت 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
