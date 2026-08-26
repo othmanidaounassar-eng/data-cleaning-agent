@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 # ✅ تعريف app
 app = FastAPI(
     title="OQZARO DataCleaning Agent",
-    version="1.0.0",
-    description="Secure and reliable data cleaning service for CSV and Excel files.",
+    version="2.0.0",
+    description="Secure and reliable data cleaning service for CSV  files.",
     docs_url=None,
     redoc_url=None,
 )
