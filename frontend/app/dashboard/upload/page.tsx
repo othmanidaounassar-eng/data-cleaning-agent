@@ -3,19 +3,33 @@
 import { useState } from "react";
 import Link from "next/link";
 import { UploadCloud, Download, FileText, Loader2 } from "lucide-react";
-// ✅ استيراد نقاط النهاية من lib/api
 import { API_ENDPOINTS } from "@/lib/api";
 
 // ============================================
-// ✅ تعريف الواجهة بدلاً من any
+// ✅ تعريف الواجهة الكاملة للنتيجة
 // ============================================
 interface CleaningResult {
   rows_before: number;
   rows_after: number;
   duplicates_removed: number;
   missing_values_filled: number;
+  outliers_detected?: number;
+  quality_score?: number;
+  execution_time_seconds?: number;
   download_url?: string;
   cleaned_file_name?: string;
+  cleaning_log?: Array<{
+    action: string;
+    description: string;
+    details: string;
+    rows_affected: number;
+    status: "completed" | "skipped";
+  }>;
+  ai_explanation?: string;
+  alerts?: string[];
+  recommendations?: string[];
+  summary?: string;
+  sample?: any[];
 }
 
 export default function UploadPage() {
@@ -55,7 +69,6 @@ export default function UploadPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      // ✅ استخدام Proxy الداخلي بدلاً من الرابط المباشر
       const url = API_ENDPOINTS.UPLOAD;
       console.log("🔍 Sending request to proxy:", url);
       console.log("📁 File:", file.name, file.size, "bytes");
@@ -204,14 +217,109 @@ export default function UploadPage() {
               <h2 className="text-xl font-bold text-white mb-4">
                 Cleaning Report
               </h2>
-              <div className="grid grid-cols-2 gap-4 text-white/80">
+
+              {/* الإحصائيات الأساسية */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-white/80">
                 <div>Rows Before: {result.rows_before ?? 0}</div>
                 <div>Rows After: {result.rows_after ?? 0}</div>
                 <div>Duplicates Removed: {result.duplicates_removed ?? 0}</div>
-                <div>
-                  Missing Values Filled: {result.missing_values_filled ?? 0}
-                </div>
+                <div>Missing Values Filled: {result.missing_values_filled ?? 0}</div>
+                <div>Outliers Detected: {result.outliers_detected ?? 0}</div>
+                <div>Quality Score: {result.quality_score ?? 0}/100</div>
+                {result.execution_time_seconds && (
+                  <div>Execution Time: {result.execution_time_seconds}s</div>
+                )}
               </div>
+
+              {/* ✅ الشرح الذكي من الذكاء الاصطناعي */}
+              {result.ai_explanation && (
+                <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-blue-400 font-semibold">🤖 AI Explanation:</p>
+                  <p className="text-white/90 text-sm leading-relaxed">
+                    {result.ai_explanation}
+                  </p>
+                </div>
+              )}
+
+              {/* ✅ السجل التفصيلي للتغييرات */}
+              {result.cleaning_log && result.cleaning_log.length > 0 && (
+                <div className="mt-6">
+                  <h3 className="text-lg font-bold text-white mb-3">
+                    📋 Detailed Change Log
+                  </h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {result.cleaning_log.map((entry, index) => {
+                      let bgColor = "bg-gray-500/10";
+                      let borderColor = "border-gray-500/20";
+                      let icon = "⏭️";
+                      if (entry.status === "completed") {
+                        bgColor = "bg-green-500/10";
+                        borderColor = "border-green-500/20";
+                        icon = "✅";
+                      } else if (entry.status === "skipped") {
+                        bgColor = "bg-gray-500/10";
+                        borderColor = "border-gray-500/20";
+                        icon = "⏭️";
+                      }
+                      return (
+                        <div
+                          key={index}
+                          className={`p-3 rounded-lg border ${bgColor} ${borderColor}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <span className="text-xl">{icon}</span>
+                            <div className="flex-1">
+                              <p className="text-white font-medium">
+                                {entry.description}
+                              </p>
+                              <p className="text-white/70 text-sm">
+                                {entry.details}
+                              </p>
+                              {entry.rows_affected > 0 && (
+                                <p className="text-white/60 text-xs mt-1">
+                                  Rows affected: {entry.rows_affected}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* التوصيات والتنبيهات إن وجدت */}
+              {result.recommendations && result.recommendations.length > 0 && (
+                <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
+                  <p className="text-yellow-400 font-semibold">💡 Recommendations:</p>
+                  <ul className="list-disc list-inside text-white/80 text-sm">
+                    {result.recommendations.map((rec, i) => (
+                      <li key={i}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.alerts && result.alerts.length > 0 && (
+                <div className="mt-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <p className="text-red-400 font-semibold">⚠️ Alerts:</p>
+                  <ul className="list-disc list-inside text-white/80 text-sm">
+                    {result.alerts.map((alert, i) => (
+                      <li key={i}>{alert}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* خلاصة عامة إن وجدت */}
+              {result.summary && (
+                <div className="mt-4 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <p className="text-white/80 text-sm">{result.summary}</p>
+                </div>
+              )}
+
+              {/* أزرار التحميل */}
               {result.download_url && (
                 <div className="mt-6 flex flex-wrap gap-4">
                   <a

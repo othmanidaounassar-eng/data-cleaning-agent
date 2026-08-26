@@ -3,6 +3,9 @@ import numpy as np
 import time
 import math
 
+# ============================================
+# دوال مساعدة للتنظيف (مأخوذة من ملفك السابق)
+# ============================================
 
 def clean_sample_value(val):
     """
@@ -25,12 +28,10 @@ def clean_sample_value(val):
     else:
         return val
 
-
 def clean_numeric_column(series):
     """
     Convert a column with currency/numbers to numeric.
     Removes $, commas, brackets, and extra spaces.
-    Handles values like '$780,000,000', '$229,100,000[b]', '[e]', etc.
     """
     s = series.astype(str).str.strip()
     s = s.str.replace(r"[\$,]", "", regex=True)
@@ -40,10 +41,9 @@ def clean_numeric_column(series):
     s = s.replace("", np.nan)
     return pd.to_numeric(s, errors="coerce")
 
-
 def clean_text_column(series):
     """
-    Clean text columns: strip whitespace, remove special symbols like †, ‡, *, and bracketed references like [1], [a], etc.
+    Clean text columns: strip whitespace, remove special symbols and bracketed references.
     """
     s = series.astype(str).str.strip()
     s = s.str.replace(r"[†‡*]", "", regex=True)
@@ -54,21 +54,17 @@ def clean_text_column(series):
     s = s.replace("", np.nan)
     return s
 
-
 def extract_year_from_range(series):
     """
     Extract the first year from a range like '2023–2024' or '2008–2009'.
-    If it's a single year, return it as integer.
     """
     s = series.astype(str).str.strip()
     years = s.str.extract(r"(\b\d{4}\b)")
     return pd.to_numeric(years[0], errors="coerce")
 
-
 def detect_outliers(df, column, method="iqr"):
     """
     Detect outliers in a numeric column using IQR or Z-score.
-    Returns a boolean mask and the number of outliers.
     """
     if df[column].dtype not in ["float64", "int64"]:
         return pd.Series([False] * len(df)), 0
@@ -91,26 +87,41 @@ def detect_outliers(df, column, method="iqr"):
         raise ValueError("method must be 'iqr' or 'zscore'")
     return outliers, outliers.sum()
 
-
 def calculate_quality_score(df_before, df_after, report):
     """
     Calculate a quality score (0-100) based on cleaning results.
-    Higher is better.
     """
-    return 100
+    # بسيط: كلما قلّ عدد التكرارات والقيم المفقودة زادت الجودة
+    rows_before = len(df_before)
+    rows_after = len(df_after)
+    dup_removed = report.get("duplicates_removed", 0)
+    missing_filled = report.get("missing_values_filled", 0)
+    outliers = report.get("outliers_detected", 0)
 
+    # نبدأ بـ 100 ثم نخصم بناءً على المشاكل
+    score = 100
+    if rows_before > 0:
+        # خصم للتكرارات (لكل 10% تكرارات نخصم 10 نقاط)
+        dup_ratio = dup_removed / rows_before if rows_before > 0 else 0
+        score -= min(30, dup_ratio * 100 * 0.3)
 
-def detect_datatype(df):
-    """Detect and return data types of all columns in a DataFrame."""
-    datatypes = {}
-    for column in df.columns:
-        datatypes[column] = str(df[column].dtype)
-    return datatypes
+        # خصم للقيم المفقودة
+        missing_ratio = missing_filled / (rows_before * len(df_before.columns)) if rows_before > 0 else 0
+        score -= min(30, missing_ratio * 100 * 0.3)
 
+        # خصم للقيم الشاذة (لكل 1% شاذة نخصم 1 نقطة)
+        outlier_ratio = outliers / rows_before if rows_before > 0 else 0
+        score -= min(20, outlier_ratio * 100 * 0.2)
+
+    return max(0, round(score))
+
+# ============================================
+# الدالة الرئيسية clean_data
+# ============================================
 
 def clean_data(df):
     """
-    Clean the DataFrame with comprehensive steps.
+    Clean the DataFrame with comprehensive steps and return a detailed log.
     """
     start_time = time.time()
     report = {
@@ -121,7 +132,7 @@ def clean_data(df):
         "datatype_converted": [],
         "columns_modified": [],
         "outliers_detected": 0,
-        "operations": [],
+        "operations": [],           # detailed log entries
         "alerts": [],
         "sample": [],
         "summary": "",
@@ -137,39 +148,49 @@ def clean_data(df):
 
     df_original = df.copy()
     df_cleaned = df.copy()
-    operations = []
+    operations = []  # ← This will hold detailed log entries
     alerts = []
     recommendations = []
+
+    # Helper to add a log entry
+    def add_log(action, description, details, rows_affected=0, status="completed"):
+        operations.append({
+            "action": action,
+            "description": description,
+            "details": details,
+            "rows_affected": rows_affected,
+            "status": status,
+        })
 
     # 1. Remove duplicates
     dup_before = df_cleaned.duplicated().sum()
     if dup_before > 0:
         df_cleaned = df_cleaned.drop_duplicates().reset_index(drop=True)
         report["duplicates_removed"] = int(dup_before)
-        operations.append(f"Removed {dup_before} duplicate rows.")
+        add_log(
+            action="duplicate_removal",
+            description=f"Removed {dup_before} duplicate rows.",
+            details=f"Duplicates were identified based on all columns. {dup_before} rows were removed.",
+            rows_affected=dup_before,
+            status="completed"
+        )
     else:
-        operations.append("No duplicate rows found.")
+        add_log(
+            action="duplicate_removal",
+            description="No duplicate rows found.",
+            details="All rows are unique. No action taken.",
+            rows_affected=0,
+            status="skipped"
+        )
 
-    # 2. Clean numeric columns
+    # 2. Clean numeric columns (as in your existing logic)
     numeric_like_cols = []
     for col in df_cleaned.columns:
         sample = df_cleaned[col].astype(str).head(100)
         has_currency = sample.str.contains(r"[\$,]", regex=True).mean() > 0.3
         if has_currency:
             numeric_like_cols.append(col)
-        elif any(
-            keyword in col.lower()
-            for keyword in [
-                "gross",
-                "salary",
-                "revenue",
-                "amount",
-                "price",
-                "avg",
-                "average",
-                "adjusted",
-            ]
-        ):
+        elif any(keyword in col.lower() for keyword in ["gross","salary","revenue","amount","price","avg","average","adjusted"]):
             numeric_like_cols.append(col)
 
     for col in numeric_like_cols:
@@ -177,11 +198,17 @@ def clean_data(df):
         if cleaned_series.notna().sum() > 0:
             df_cleaned[col] = cleaned_series
             report["datatype_converted"].append(col)
-            report["column_conversions"].append(
-                {"column": col, "from": "object/string", "to": "numeric"}
-            )
-            operations.append(
-                f"Converted column '{col}' to numeric (removed $, commas, brackets)."
+            report["column_conversions"].append({
+                "column": col,
+                "from": "object/string",
+                "to": "numeric"
+            })
+            add_log(
+                action="type_conversion",
+                description=f"Converted column '{col}' to numeric.",
+                details=f"Removed currency symbols, commas, and brackets. Values like '$780,000' became 780000.",
+                rows_affected=len(df_cleaned),
+                status="completed"
             )
 
     # 3. Clean text columns
@@ -190,35 +217,62 @@ def clean_data(df):
         df_cleaned[col] = clean_text_column(df_cleaned[col])
         report["text_columns_cleaned"].append(col)
     if text_cols:
-        operations.append(
-            f"Cleaned special characters in {len(text_cols)} text columns."
+        add_log(
+            action="text_cleaning",
+            description=f"Cleaned special characters in {len(text_cols)} text columns.",
+            details="Removed footnotes like †, ‡, *, bracketed references, and extra spaces.",
+            rows_affected=len(df_cleaned),
+            status="completed"
+        )
+    else:
+        add_log(
+            action="text_cleaning",
+            description="No text columns needed cleaning.",
+            details="All text columns were already clean.",
+            rows_affected=0,
+            status="skipped"
         )
 
-    # 4. Handle Year(s) column
-    year_cols = [
-        col for col in df_cleaned.columns if "year" in col.lower() or "Year" in col
-    ]
+    # 4. Handle Year columns
+    year_cols = [col for col in df_cleaned.columns if "year" in col.lower() or "Year" in col]
     for col in year_cols:
         sample = df_cleaned[col].astype(str).head(20)
         if sample.str.contains(r"\d{4}[-–]\d{4}").any():
             df_cleaned[col] = extract_year_from_range(df_cleaned[col])
             report["datatype_converted"].append(col)
-            report["column_conversions"].append(
-                {"column": col, "from": "string/range", "to": "numeric (year)"}
+            report["column_conversions"].append({
+                "column": col,
+                "from": "string/range",
+                "to": "numeric (year)"
+            })
+            add_log(
+                action="type_conversion",
+                description=f"Extracted first year from '{col}' column.",
+                details="Converted ranges like '2023–2024' to 2023.",
+                rows_affected=len(df_cleaned),
+                status="completed"
             )
-            operations.append(f"Extracted first year from '{col}' column.")
         else:
             converted = pd.to_numeric(df_cleaned[col], errors="coerce")
             if converted.notna().sum() > 0:
                 df_cleaned[col] = converted
                 report["datatype_converted"].append(col)
-                report["column_conversions"].append(
-                    {"column": col, "from": "string", "to": "numeric"}
+                report["column_conversions"].append({
+                    "column": col,
+                    "from": "string",
+                    "to": "numeric"
+                })
+                add_log(
+                    action="type_conversion",
+                    description=f"Converted column '{col}' to numeric.",
+                    details="All values were convertible to numbers.",
+                    rows_affected=len(df_cleaned),
+                    status="completed"
                 )
-                operations.append(f"Converted column '{col}' to numeric.")
 
     # 5. Handle missing values
     total_missing = 0
+    missing_details = []
     for col in df_cleaned.columns:
         missing = df_cleaned[col].isna().sum()
         if missing == 0:
@@ -228,52 +282,92 @@ def clean_data(df):
             value = df_cleaned[col].median()
             if pd.isna(value):
                 value = df_cleaned[col].mean()
+            strategy = "median" if not pd.isna(df_cleaned[col].median()) else "mean"
         elif pd.api.types.is_datetime64_any_dtype(df_cleaned[col]):
             mode_series = df_cleaned[col].mode()
             value = mode_series.iloc[0] if not mode_series.empty else pd.NaT
+            strategy = "mode"
         else:
             mode_series = df_cleaned[col].mode()
             value = mode_series.iloc[0] if not mode_series.empty else "Unknown"
+            strategy = "mode"
         df_cleaned[col] = df_cleaned[col].fillna(value)
         report["columns_modified"].append(col)
+        missing_details.append(f"Column '{col}': filled {missing} missing values using {strategy}.")
+
     report["missing_values_filled"] = int(total_missing)
     report["missing_values_total"] = int(total_missing)
     if total_missing > 0:
-        operations.append(f"Filled {total_missing} missing values.")
+        add_log(
+            action="missing_values",
+            description=f"Filled {total_missing} missing values.",
+            details="; ".join(missing_details),
+            rows_affected=total_missing,
+            status="completed"
+        )
     else:
-        operations.append("No missing values found.")
+        add_log(
+            action="missing_values",
+            description="No missing values found.",
+            details="All columns have complete data.",
+            rows_affected=0,
+            status="skipped"
+        )
 
     # 6. Detect outliers
-    numeric_cols = df_cleaned.select_dtypes(
-        include=["float64", "int64"]
-    ).columns.tolist()
+    numeric_cols = df_cleaned.select_dtypes(include=["float64","int64"]).columns.tolist()
     total_outliers = 0
+    outlier_cols = []
     for col in numeric_cols:
         mask, count = detect_outliers(df_cleaned, col, method="iqr")
         if count > 0:
             total_outliers += count
+            outlier_cols.append(col)
             alerts.append(f"Column '{col}' contains {count} outliers (based on IQR).")
     report["outliers_detected"] = int(total_outliers)
     if total_outliers > 0:
-        operations.append(f"Detected {total_outliers} outliers.")
-        recommendations.append(
-            "Consider further investigation or transformation of outlier values."
+        add_log(
+            action="outlier_detection",
+            description=f"Detected {total_outliers} outliers across {len(outlier_cols)} columns.",
+            details=f"Columns: {', '.join(outlier_cols)}. Used Interquartile Range (IQR) method.",
+            rows_affected=total_outliers,
+            status="completed"
         )
+        recommendations.append("Consider further investigation or transformation of outlier values.")
     else:
-        operations.append("No outliers detected.")
+        add_log(
+            action="outlier_detection",
+            description="No outliers detected.",
+            details="All numeric columns have values within normal range (IQR method).",
+            rows_affected=0,
+            status="skipped"
+        )
 
-    # 7. Generate sample (with JSON-safe conversion)
+    # 7. Identify unchanged columns (clean already)
+    for col in df_original.columns:
+        if col in df_cleaned.columns:
+            # If column appears in any conversion list, skip
+            if col not in report["datatype_converted"] and col not in report["columns_modified"]:
+                add_log(
+                    action="unchanged",
+                    description=f"Column '{col}' was not modified.",
+                    details="The data was already clean and required no changes.",
+                    rows_affected=0,
+                    status="skipped"
+                )
+
+    # 8. Generate sample (existing)
     raw_sample = df_cleaned.head(5).to_dict(orient="records")
     clean_sample = [clean_sample_value(row) for row in raw_sample]
     report["sample"] = clean_sample
 
-    # 8. Quality Score
+    # 9. Quality Score (existing)
     quality_score = calculate_quality_score(df_original, df_cleaned, report)
     if not math.isfinite(quality_score):
         quality_score = 0
     report["quality_score"] = quality_score
 
-    # 9. Summary
+    # 10. Summary (existing)
     rows_before = len(df_original)
     summary = (
         f"Cleaned {rows_before} rows. Removed {report['duplicates_removed']} duplicates, "
@@ -284,17 +378,14 @@ def clean_data(df):
     report["summary"] = summary
 
     if quality_score < 60:
-        recommendations.append(
-            "Dataset quality is low. Consider reviewing cleaning steps or data collection."
-        )
+        recommendations.append("Dataset quality is low. Consider reviewing cleaning steps or data collection.")
     else:
         recommendations.append("Data quality is acceptable for analysis.")
 
-    report["operations"] = [{"label": op, "done": True} for op in operations]
+    # ⭐ Assign detailed operations to report
+    report["operations"] = operations
     report["alerts"] = alerts
     report["recommendations"] = recommendations
-
-    # Time in seconds
-    report["processing_time_ms"] = round((time.time() - start_time), 2)
+    report["processing_time_ms"] = round((time.time() - start_time) * 1000, 2)
 
     return df_cleaned, report
