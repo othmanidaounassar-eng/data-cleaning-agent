@@ -6,7 +6,7 @@ import { UploadCloud, Download, FileText, Loader2 } from "lucide-react";
 import { API_ENDPOINTS } from "@/lib/api";
 
 // ============================================
-// ✅ تعريف الواجهة الكاملة للنتيجة
+// ✅ تعريف الواجهة الكاملة للنتيجة (بدون any)
 // ============================================
 interface CleaningResult {
   rows_before: number;
@@ -29,7 +29,9 @@ interface CleaningResult {
   alerts?: string[];
   recommendations?: string[];
   summary?: string;
-  sample?: any[];
+  // ✅ تم استبدال any[] بنوع أكثر تحديداً
+  sample?: Array<Record<string, unknown>>;
+  column_data_types?: Record<string, string>;
 }
 
 export default function UploadPage() {
@@ -231,7 +233,21 @@ export default function UploadPage() {
                 )}
               </div>
 
-              {/* ✅ الشرح الذكي من الذكاء الاصطناعي */}
+              {/* ✅ أنواع البيانات لكل عمود */}
+              {result.column_data_types && Object.keys(result.column_data_types).length > 0 && (
+                <div className="mt-4 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
+                  <p className="text-white font-semibold">📊 Column Data Types:</p>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+                    {Object.entries(result.column_data_types).map(([col, dtype]) => (
+                      <div key={col} className="text-white/80 text-sm">
+                        <span className="font-mono">{col}</span>: <span className="text-orange-400">{dtype}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* ✅ الشرح الذكي (إن وجد) */}
               {result.ai_explanation && (
                 <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-blue-400 font-semibold">🤖 AI Explanation:</p>
@@ -289,7 +305,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* التوصيات والتنبيهات إن وجدت */}
+              {/* التوصيات والتنبيهات */}
               {result.recommendations && result.recommendations.length > 0 && (
                 <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
                   <p className="text-yellow-400 font-semibold">💡 Recommendations:</p>
@@ -312,7 +328,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* خلاصة عامة إن وجدت */}
+              {/* خلاصة عامة */}
               {result.summary && (
                 <div className="mt-4 p-3 bg-gray-500/10 border border-gray-500/20 rounded-lg">
                   <p className="text-white/80 text-sm">{result.summary}</p>

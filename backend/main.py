@@ -110,7 +110,7 @@ async def health_check():
         "status": "healthy",
         "timestamp": int(time.time()),
         "service": "OQZARO DataCleaning Agent",
-        "version": "1.0.0",
+        "version": "2.0.0",
     }
 
 @app.exception_handler(HTTPException)
