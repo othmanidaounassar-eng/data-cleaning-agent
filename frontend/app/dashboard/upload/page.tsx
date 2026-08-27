@@ -6,7 +6,7 @@ import { UploadCloud, Download, FileText, Loader2 } from "lucide-react";
 import { API_ENDPOINTS } from "@/lib/api";
 
 // ============================================
-// ✅ تعريف الواجهة الكاملة للنتيجة (بدون any)
+// ✅ تعريف الواجهة الكاملة للنتيجة
 // ============================================
 interface CleaningResult {
   rows_before: number;
@@ -24,12 +24,12 @@ interface CleaningResult {
     details: string;
     rows_affected: number;
     status: "completed" | "skipped";
+    reason?: string;   // ✅ تم إضافة السبب
   }>;
   ai_explanation?: string;
   alerts?: string[];
   recommendations?: string[];
   summary?: string;
-  // ✅ تم استبدال any[] بنوع أكثر تحديداً
   sample?: Array<Record<string, unknown>>;
   column_data_types?: Record<string, string>;
 }
@@ -247,7 +247,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* ✅ الشرح الذكي (إن وجد) */}
+              {/* ✅ الشرح الذكي من الذكاء الاصطناعي */}
               {result.ai_explanation && (
                 <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
                   <p className="text-blue-400 font-semibold">🤖 AI Explanation:</p>
@@ -257,7 +257,7 @@ export default function UploadPage() {
                 </div>
               )}
 
-              {/* ✅ السجل التفصيلي للتغييرات */}
+              {/* ✅ السجل التفصيلي للتغييرات مع الأسباب */}
               {result.cleaning_log && result.cleaning_log.length > 0 && (
                 <div className="mt-6">
                   <h3 className="text-lg font-bold text-white mb-3">
@@ -294,6 +294,13 @@ export default function UploadPage() {
                               {entry.rows_affected > 0 && (
                                 <p className="text-white/60 text-xs mt-1">
                                   Rows affected: {entry.rows_affected}
+                                </p>
+                              )}
+                              {/* ✅ عرض السبب هنا */}
+                              {entry.reason && (
+                                <p className="text-blue-400 text-sm mt-1 flex items-start gap-1">
+                                  <span>💡</span>
+                                  <span className="italic">السبب: {entry.reason}</span>
                                 </p>
                               )}
                             </div>
