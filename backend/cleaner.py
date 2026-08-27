@@ -2,13 +2,43 @@ import pandas as pd
 import numpy as np
 import time
 import math
+from ai_explainer import client
 
 # ============================================================
-# Helper functions
+# Helper: Generate reason using DeepSeek
+# ============================================================
+def generate_reason_for_action(action_type, description, details, sample_data=None):
+    """Call DeepSeek to generate a concise reason for a specific cleaning action."""
+    # Skip AI call for trivial messages
+    if "No duplicate" in description or "No missing" in description or "No outliers" in description:
+        return "Data was already clean; no action needed."
+
+    prompt = f"""
+    You are a data cleaning expert. Explain in **one short Arabic sentence** why we performed this action:
+    Action: {description}
+    Details: {details}
+    Reason:
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": "You are a data cleaning expert. Give very short, clear reasons."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=60
+        )
+        return response.choices[0].message.content.strip()
+    except Exception:
+        return f"Performed to improve data quality."
+
+# ============================================================
+# Standard helpers (clean_sample_value, clean_numeric_column, etc.)
 # ============================================================
 
 def clean_sample_value(val):
-    """Convert a value to JSON-serializable type, handling inf and NaN."""
     if isinstance(val, float):
         if math.isnan(val) or math.isinf(val):
             return None
@@ -26,7 +56,6 @@ def clean_sample_value(val):
     return val
 
 def clean_numeric_column(series):
-    """Convert currency/numbers to numeric, removing $, commas, brackets."""
     s = series.astype(str).str.strip()
     s = s.str.replace(r"[\$,]", "", regex=True)
     s = s.str.replace(r"\[[^\]]*\]", "", regex=True)
@@ -36,7 +65,6 @@ def clean_numeric_column(series):
     return pd.to_numeric(s, errors="coerce")
 
 def clean_text_column(series):
-    """Clean text: remove special symbols and bracketed references."""
     s = series.astype(str).str.strip()
     s = s.str.replace(r"[†‡*]", "", regex=True)
     s = s.str.replace(r"\[\d+\]", "", regex=True)
@@ -47,13 +75,11 @@ def clean_text_column(series):
     return s
 
 def extract_year_from_range(series):
-    """Extract first year from range like '2023–2024'."""
     s = series.astype(str).str.strip()
     years = s.str.extract(r"(\b\d{4}\b)")
     return pd.to_numeric(years[0], errors="coerce")
 
 def detect_outliers(df, column, method="iqr"):
-    """Detect outliers using IQR or Z-score."""
     if df[column].dtype not in ["float64", "int64"]:
         return pd.Series([False] * len(df)), 0
 
@@ -74,11 +100,9 @@ def detect_outliers(df, column, method="iqr"):
             outliers = abs(z) > 3
     else:
         raise ValueError("method must be 'iqr' or 'zscore'")
-
     return outliers, outliers.sum()
 
 def calculate_quality_score(df_before, df_after, report):
-    """Calculate quality score (0-100) based on cleaning results."""
     rows_before = len(df_before)
     dup_removed = report.get("duplicates_removed", 0)
     missing_filled = report.get("missing_values_filled", 0)
@@ -92,20 +116,15 @@ def calculate_quality_score(df_before, df_after, report):
         score -= min(30, missing_ratio * 100 * 0.3)
         outlier_ratio = outliers / rows_before
         score -= min(20, outlier_ratio * 100 * 0.2)
-
     return max(0, round(score))
 
 # ============================================================
-# Main clean_data function
+# Main clean_data function (with reasons)
 # ============================================================
 
 def clean_data(df):
-    """
-    Clean the DataFrame with comprehensive steps and return a detailed log.
-    """
     start_time = time.time()
 
-    # Initialize report
     report = {
         "duplicates_removed": 0,
         "missing_values_filled": 0,
@@ -122,7 +141,7 @@ def clean_data(df):
         "column_conversions": [],
         "quality_score": 0,
         "processing_time_ms": 0,
-        "column_data_types": {},   # ✅ سيتم ملؤه لاحقاً
+        "column_data_types": {},
     }
 
     if df is None or df.empty:
@@ -135,37 +154,27 @@ def clean_data(df):
     alerts = []
     recommendations = []
 
-    def add_log(action, description, details, rows_affected=0, status="completed"):
+    def add_log(action, description, details, rows_affected=0, status="completed", reason=None):
         operations.append({
             "action": action,
             "description": description,
             "details": details,
             "rows_affected": rows_affected,
             "status": status,
+            "reason": reason,
         })
 
-    # 1. Remove duplicates
+    # --- 1. Duplicates ---
     dup_before = df_cleaned.duplicated().sum()
     if dup_before > 0:
         df_cleaned = df_cleaned.drop_duplicates().reset_index(drop=True)
         report["duplicates_removed"] = int(dup_before)
-        add_log(
-            action="duplicate_removal",
-            description=f"Removed {dup_before} duplicate rows.",
-            details="Duplicates were identified based on all columns.",
-            rows_affected=dup_before,
-            status="completed"
-        )
+        reason = generate_reason_for_action("duplicate_removal", f"Removed {dup_before} duplicate rows.", "Duplicates were identified based on all columns.")
+        add_log("duplicate_removal", f"Removed {dup_before} duplicate rows.", "Duplicates were identified based on all columns.", dup_before, "completed", reason)
     else:
-        add_log(
-            action="duplicate_removal",
-            description="No duplicate rows found.",
-            details="All rows are unique.",
-            rows_affected=0,
-            status="skipped"
-        )
+        add_log("duplicate_removal", "No duplicate rows found.", "All rows are unique.", 0, "skipped", "Data was already clean; no duplicate rows to remove.")
 
-    # 2. Clean numeric columns
+    # --- 2. Numeric columns ---
     numeric_like_cols = []
     for col in df_cleaned.columns:
         sample = df_cleaned[col].astype(str).head(100)
@@ -180,80 +189,41 @@ def clean_data(df):
         if cleaned_series.notna().sum() > 0:
             df_cleaned[col] = cleaned_series
             report["datatype_converted"].append(col)
-            report["column_conversions"].append({
-                "column": col,
-                "from": "object/string",
-                "to": "numeric"
-            })
-            add_log(
-                action="type_conversion",
-                description=f"Converted column '{col}' to numeric.",
-                details="Removed currency symbols, commas, and brackets.",
-                rows_affected=len(df_cleaned),
-                status="completed"
-            )
+            report["column_conversions"].append({"column": col, "from": "object/string", "to": "numeric"})
+            reason = generate_reason_for_action("type_conversion", f"Converted column '{col}' to numeric.", "Removed currency symbols, commas, and brackets.")
+            add_log("type_conversion", f"Converted column '{col}' to numeric.", "Removed currency symbols, commas, and brackets.", len(df_cleaned), "completed", reason)
 
-    # 3. Clean text columns
+    # --- 3. Text cleaning ---
     text_cols = df_cleaned.select_dtypes(include=["object"]).columns.tolist()
     for col in text_cols:
         df_cleaned[col] = clean_text_column(df_cleaned[col])
         report["text_columns_cleaned"].append(col)
-
     if text_cols:
-        add_log(
-            action="text_cleaning",
-            description=f"Cleaned {len(text_cols)} text columns.",
-            details="Removed special characters and extra spaces.",
-            rows_affected=len(df_cleaned),
-            status="completed"
-        )
+        reason = generate_reason_for_action("text_cleaning", f"Cleaned {len(text_cols)} text columns.", "Removed special characters and extra spaces.")
+        add_log("text_cleaning", f"Cleaned {len(text_cols)} text columns.", "Removed special characters and extra spaces.", len(df_cleaned), "completed", reason)
     else:
-        add_log(
-            action="text_cleaning",
-            description="No text columns needed cleaning.",
-            details="All text columns were already clean.",
-            rows_affected=0,
-            status="skipped"
-        )
+        add_log("text_cleaning", "No text columns needed cleaning.", "All text columns were already clean.", 0, "skipped", "Data was already clean; no text cleaning required.")
 
-    # 4. Handle Year columns
+    # --- 4. Year columns ---
     year_cols = [col for col in df_cleaned.columns if "year" in col.lower()]
     for col in year_cols:
         sample = df_cleaned[col].astype(str).head(20)
         if sample.str.contains(r"\d{4}[-–]\d{4}").any():
             df_cleaned[col] = extract_year_from_range(df_cleaned[col])
             report["datatype_converted"].append(col)
-            report["column_conversions"].append({
-                "column": col,
-                "from": "string/range",
-                "to": "numeric (year)"
-            })
-            add_log(
-                action="type_conversion",
-                description=f"Extracted year from '{col}' column.",
-                details="Converted ranges like '2023–2024' to 2023.",
-                rows_affected=len(df_cleaned),
-                status="completed"
-            )
+            report["column_conversions"].append({"column": col, "from": "string/range", "to": "numeric (year)"})
+            reason = generate_reason_for_action("type_conversion", f"Extracted year from '{col}' column.", "Converted ranges like '2023–2024' to 2023.")
+            add_log("type_conversion", f"Extracted year from '{col}' column.", "Converted ranges like '2023–2024' to 2023.", len(df_cleaned), "completed", reason)
         else:
             converted = pd.to_numeric(df_cleaned[col], errors="coerce")
             if converted.notna().sum() > 0:
                 df_cleaned[col] = converted
                 report["datatype_converted"].append(col)
-                report["column_conversions"].append({
-                    "column": col,
-                    "from": "string",
-                    "to": "numeric"
-                })
-                add_log(
-                    action="type_conversion",
-                    description=f"Converted column '{col}' to numeric.",
-                    details="All values were convertible to numbers.",
-                    rows_affected=len(df_cleaned),
-                    status="completed"
-                )
+                report["column_conversions"].append({"column": col, "from": "string", "to": "numeric"})
+                reason = generate_reason_for_action("type_conversion", f"Converted column '{col}' to numeric.", "All values were convertible to numbers.")
+                add_log("type_conversion", f"Converted column '{col}' to numeric.", "All values were convertible to numbers.", len(df_cleaned), "completed", reason)
 
-    # 5. Handle missing values
+    # --- 5. Missing values ---
     total_missing = 0
     missing_details = []
     for col in df_cleaned.columns:
@@ -261,7 +231,6 @@ def clean_data(df):
         if missing == 0:
             continue
         total_missing += missing
-
         if pd.api.types.is_numeric_dtype(df_cleaned[col]):
             value = df_cleaned[col].median()
             if pd.isna(value):
@@ -271,7 +240,6 @@ def clean_data(df):
             mode_series = df_cleaned[col].mode()
             value = mode_series.iloc[0] if not mode_series.empty else "Unknown"
             strategy = "mode"
-
         df_cleaned[col] = df_cleaned[col].fillna(value)
         report["columns_modified"].append(col)
         missing_details.append(f"Column '{col}': filled {missing} values using {strategy}.")
@@ -280,23 +248,12 @@ def clean_data(df):
     report["missing_values_total"] = int(total_missing)
 
     if total_missing > 0:
-        add_log(
-            action="missing_values",
-            description=f"Filled {total_missing} missing values.",
-            details="; ".join(missing_details),
-            rows_affected=total_missing,
-            status="completed"
-        )
+        reason = generate_reason_for_action("missing_values", f"Filled {total_missing} missing values.", "; ".join(missing_details))
+        add_log("missing_values", f"Filled {total_missing} missing values.", "; ".join(missing_details), total_missing, "completed", reason)
     else:
-        add_log(
-            action="missing_values",
-            description="No missing values found.",
-            details="All columns have complete data.",
-            rows_affected=0,
-            status="skipped"
-        )
+        add_log("missing_values", "No missing values found.", "All columns have complete data.", 0, "skipped", "Data was already clean; no missing values to fill.")
 
-    # 6. Detect outliers
+    # --- 6. Outliers ---
     numeric_cols = df_cleaned.select_dtypes(include=["float64", "int64"]).columns.tolist()
     total_outliers = 0
     outlier_cols = []
@@ -310,47 +267,30 @@ def clean_data(df):
     report["outliers_detected"] = int(total_outliers)
 
     if total_outliers > 0:
-        add_log(
-            action="outlier_detection",
-            description=f"Detected {total_outliers} outliers.",
-            details=f"Columns: {', '.join(outlier_cols)}. Used IQR method.",
-            rows_affected=total_outliers,
-            status="completed"
-        )
+        reason = generate_reason_for_action("outlier_detection", f"Detected {total_outliers} outliers.", f"Columns: {', '.join(outlier_cols)}. Used IQR method.")
+        add_log("outlier_detection", f"Detected {total_outliers} outliers.", f"Columns: {', '.join(outlier_cols)}. Used IQR method.", total_outliers, "completed", reason)
         recommendations.append("Consider investigating outlier values.")
     else:
-        add_log(
-            action="outlier_detection",
-            description="No outliers detected.",
-            details="All values are within normal range (IQR method).",
-            rows_affected=0,
-            status="skipped"
-        )
+        add_log("outlier_detection", "No outliers detected.", "All values are within normal range (IQR method).", 0, "skipped", "Data was already clean; no outliers found.")
 
-    # 7. Identify unchanged columns
+    # --- 7. Unchanged columns ---
     for col in df_original.columns:
         if col in df_cleaned.columns:
             if col not in report["datatype_converted"] and col not in report["columns_modified"]:
-                add_log(
-                    action="unchanged",
-                    description=f"Column '{col}' was not modified.",
-                    details="The data was already clean.",
-                    rows_affected=0,
-                    status="skipped"
-                )
+                add_log("unchanged", f"Column '{col}' was not modified.", "The data was already clean.", 0, "skipped", "Data was already clean; no changes needed.")
 
-    # 8. Generate sample
+    # --- 8. Sample ---
     raw_sample = df_cleaned.head(5).to_dict(orient="records")
     clean_sample = [clean_sample_value(row) for row in raw_sample]
     report["sample"] = clean_sample
 
-    # 9. Quality score
+    # --- 9. Quality Score ---
     quality_score = calculate_quality_score(df_original, df_cleaned, report)
     if not math.isfinite(quality_score):
         quality_score = 0
     report["quality_score"] = quality_score
 
-    # 10. Summary
+    # --- 10. Summary ---
     rows_before = len(df_original)
     summary = (
         f"Cleaned {rows_before} rows. Removed {report['duplicates_removed']} duplicates, "
@@ -365,15 +305,12 @@ def clean_data(df):
     else:
         recommendations.append("Data quality is acceptable for analysis.")
 
-    # Assign final data
     report["operations"] = operations
     report["alerts"] = alerts
     report["recommendations"] = recommendations
     report["processing_time_ms"] = round((time.time() - start_time) * 1000, 2)
 
-    # ============================================================
-    # ✅ إضافة أنواع البيانات لكل عمود
-    # ============================================================
+    # --- 11. Column Data Types ---
     column_data_types = {}
     for col in df_cleaned.columns:
         dtype = str(df_cleaned[col].dtype)

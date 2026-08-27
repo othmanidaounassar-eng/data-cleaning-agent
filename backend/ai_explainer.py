@@ -1,33 +1,41 @@
 import os
 from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ============================================
+# DeepSeek Client
+# ============================================
+client = OpenAI(
+    api_key=os.getenv("DEEPSEEK_API_KEY"),
+    base_url="https://api.deepseek.com/v1"
+)
 
 def explain_cleaning_with_log(rows_before, rows_after, cleaning_log):
-    """Generate AI explanation based on cleaning log."""
+    """
+    Generate a summary explanation using DeepSeek.
+    """
     if not cleaning_log:
-        return "لم يتم تنفيذ أي عمليات تنظيف."
+        return "No cleaning operations were performed."
 
     log_text = ""
     for entry in cleaning_log:
-        status_emoji = "✅" if entry.get("status") == "completed" else "⏭️"
-        log_text += f"{status_emoji} {entry.get('description', '')} – {entry.get('details', '')}\n"
+        status = "✅" if entry.get("status") == "completed" else "⏭️"
+        log_text += f"{status} {entry.get('description', '')}\n"
 
     prompt = f"""
-    أنت خبير في تحليل البيانات. بناءً على السجل التالي، اشرح بالعربية الفصحى ما تم إجراؤه على البيانات.
-    البيانات:
-    - عدد الصفوف قبل التنظيف: {rows_before}
-    - عدد الصفوف بعد التنظيف: {rows_after}
-    - السجل التفصيلي:
+    You are a data analysis expert. Based on the following cleaning log, explain in **Arabic** what was done to the data.
+    Data:
+    - Rows before: {rows_before}
+    - Rows after: {rows_after}
+    - Log:
     {log_text}
-    قدم شرحاً موجزاً (4 جمل) يوضح العمليات التي تمت وأسبابها.
+    Provide a brief explanation (4 sentences) in Arabic.
     """
 
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="deepseek-chat",
             messages=[
-                {"role": "system", "content": "أنت مساعد متخصص في تحليل البيانات."},
+                {"role": "system", "content": "You are a helpful data assistant."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.5,
@@ -36,4 +44,4 @@ def explain_cleaning_with_log(rows_before, rows_after, cleaning_log):
         return response.choices[0].message.content.strip()
     except Exception as e:
         print(f"AI explanation error: {e}")
-        return "تم تنظيف البيانات. راجع السجل للتفاصيل."
+        return "Data cleaning completed. Check the detailed log."
