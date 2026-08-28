@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import time
 import math
-from ai_explainer import client
+#from ai_explainer import client
 
 # ============================================================
 # Helper: Generate reason using DeepSeek
@@ -20,19 +20,19 @@ def generate_reason_for_action(action_type, description, details, sample_data=No
     Reason:
     """
 
-    try:
-        response = client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[
-                {"role": "system", "content": "You are a data cleaning expert. Give very short, clear reasons."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.3,
-            max_tokens=60
-        )
-        return response.choices[0].message.content.strip()
-    except Exception:
-        return f"Performed to improve data quality."
+   # try:
+        #response = client.chat.completions.create(
+           # model="deepseek-chat",
+           # messages=[
+               # {"role": "system", "content": "You are a data cleaning expert. Give very short, clear reasons."},
+              #  {"role": "user", "content": prompt}
+           # ],
+           # temperature=0.3,
+           # max_tokens=60
+       # )
+       # return response.choices[0].message.content.strip()
+   # except Exception:
+        #return f"Performed to improve data quality."
 
 # ============================================================
 # Standard helpers (clean_sample_value, clean_numeric_column, etc.)

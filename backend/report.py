@@ -1,7 +1,7 @@
 # cspell:ignore OQZARO
 """Report generation utilities for OQZARO DataCleaning Agent."""
 
-from ai_explainer import explain_cleaning_with_log
+#from ai_explainer import explain_cleaning_with_log
 
 def generate_report(before: dict, after: dict, cleaning_report: dict, execution_time: float) -> dict:
     """
@@ -51,10 +51,10 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "column_data_types": column_data_types,
     }
 
-    if cleaning_log:
-        ai_explanation = explain_cleaning_with_log(rows_before, rows_after, cleaning_log)
-        report["ai_explanation"] = ai_explanation
-    else:
-        report["ai_explanation"] = "No cleaning operations were performed."
+    #if cleaning_log:
+        #ai_explanation = explain_cleaning_with_log(rows_before, rows_after, cleaning_log)
+        #report["ai_explanation"] = ai_explanation
+   # else:
+       # report["ai_explanation"] = "No cleaning operations were performed."
 
     return report
