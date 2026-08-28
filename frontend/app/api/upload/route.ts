@@ -4,6 +4,9 @@ import { NextRequest, NextResponse } from 'next/server';
 // 🔥 Changed fallback port from 8000 to 8001
 const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:8001';
 
+// ✅ تم إضافة هذا السطر لطباعة الرابط المستخدم في سجلات Vercel
+console.log(`🔗 [Vercel] BACKEND_URL = ${BACKEND_URL}`);
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
