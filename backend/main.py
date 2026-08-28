@@ -20,11 +20,10 @@ from report import generate_report
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ✅ تعريف app
 app = FastAPI(
     title="OQZARO DataCleaning Agent",
     version="2.0.0",
-    description="Secure and reliable data cleaning service for CSV  files.",
+    description="Secure and reliable data cleaning service for CSV files.",
     docs_url=None,
     redoc_url=None,
 )
