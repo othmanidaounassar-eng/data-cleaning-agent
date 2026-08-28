@@ -1,7 +1,8 @@
 // frontend/app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:8000';
+// 🔥 Changed fallback port from 8000 to 8001
+const BACKEND_URL = process.env.BACKEND_API_URL || 'http://localhost:8001';
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,17 +16,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // تحويل الملف إلى ArrayBuffer ثم Blob
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type });
     const backendFormData = new FormData();
     backendFormData.append('file', blob, file.name);
 
-    // ✅ إرسال الطلب بدون duplex (غير مطلوب في الإصدارات الحديثة)
     const response = await fetch(`${BACKEND_URL}/clean`, {
       method: 'POST',
       body: backendFormData,
-      signal: AbortSignal.timeout(300000), // 5 دقائق
+      signal: AbortSignal.timeout(300000),
     });
 
     const responseText = await response.text();

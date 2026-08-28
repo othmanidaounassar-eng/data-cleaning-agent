@@ -6,6 +6,7 @@ import logging
 import os
 import time
 import uuid
+import traceback
 from io import BytesIO
 
 import pandas as pd
@@ -78,6 +79,9 @@ def _read_uploaded_file(file):
         raise HTTPException(status_code=400, detail=f"Failed to read file: {str(error)}") from error
     return df
 
+# ============================================================
+# ✅ نقطة النهاية الرئيسية (مع ظهور الخطأ الكامل)
+# ============================================================
 @app.post("/clean", status_code=status.HTTP_200_OK)
 async def clean_dataset(file: UploadFile = File(...)):
     start_time = time.time()
@@ -97,11 +101,18 @@ async def clean_dataset(file: UploadFile = File(...)):
         report["cleaned_file_name"] = f"cleaned_{uuid.uuid4().hex[:8]}.csv"
 
         return JSONResponse(content=report)
-    except HTTPException:
-        raise
     except Exception as error:
+        # ✅ طباعة الخطأ الكامل في الطرفية
+        print("=" * 60)
+        print("❌ ERROR in /clean endpoint:")
+        traceback.print_exc()
+        print("=" * 60)
         logger.error("Unexpected error: %s", error, exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal server error") from error
+        # ✅ إرجاع التفاصيل في الرد (بدلاً من رسالة عامة)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error: {str(error)}\nTraceback: {traceback.format_exc()}"
+        ) from error
 
 @app.get("/", include_in_schema=False)
 async def health_check():
@@ -119,4 +130,11 @@ async def http_exception_handler(_, exc):
 @app.exception_handler(Exception)
 async def generic_exception_handler(_, exc):
     logger.error("Unhandled exception: %s", exc, exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred. Please try again later."})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again later."}
+    )
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
