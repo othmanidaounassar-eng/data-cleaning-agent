@@ -3,42 +3,12 @@ import numpy as np
 import time
 import math
 
-# AI temporarily disabled – import commented out
-# from ai_explainer import client
-
 # ============================================================
 # Helper: Generate reason (AI disabled – returns fixed text)
 # ============================================================
 def generate_reason_for_action(action_type, description, details, sample_data=None):
-    """Return a fixed reason (AI is currently disabled)."""
-    # AI is disabled – return a default reason.
+    """Return a fixed reason (AI is disabled)."""
     return "تم تنفيذ هذه العملية لتحسين جودة البيانات."
-
-    # The old AI code is kept below (commented) for later re‑activation.
-    #
-    # if "No duplicate" in description or "No missing" in description or "No outliers" in description:
-    #     return "Data was already clean; no action needed."
-    #
-    # prompt = f"""
-    # You are a data cleaning expert. Explain in **one short Arabic sentence** why we performed this action:
-    # Action: {description}
-    # Details: {details}
-    # Reason:
-    # """
-    # try:
-    #     response = client.chat.completions.create(
-    #         model="deepseek-chat",
-    #         messages=[
-    #             {"role": "system", "content": "You are a data cleaning expert. Give very short, clear reasons."},
-    #             {"role": "user", "content": prompt}
-    #         ],
-    #         temperature=0.3,
-    #         max_tokens=60
-    #     )
-    #     return response.choices[0].message.content.strip()
-    # except Exception:
-    #     return "Performed to improve data quality."
-
 
 # ============================================================
 # Standard helpers
@@ -123,7 +93,6 @@ def calculate_quality_score(df_before, df_after, report):
         outlier_ratio = outliers / rows_before
         score -= min(20, outlier_ratio * 100 * 0.2)
     return max(0, round(score))
-
 
 # ============================================================
 # Main clean_data function

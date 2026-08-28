@@ -1,13 +1,10 @@
 # cspell:ignore OQZARO
 """Report generation utilities for OQZARO DataCleaning Agent."""
 
-# AI temporarily disabled – import commented out
-# from ai_explainer import explain_cleaning_with_log
-
 def generate_report(before: dict, after: dict, cleaning_report: dict, execution_time: float) -> dict:
     """
     Generate the final cleaning report with detailed log and column data types.
-    AI explanation is currently disabled – returns a fixed message.
+    AI explanation is disabled – returns a fixed message.
     """
     rows_before = before.get("rows", 0)
     rows_after = after.get("rows", 0)
