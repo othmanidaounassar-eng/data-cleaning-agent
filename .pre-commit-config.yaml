@@ -25,7 +25,9 @@ repos:
     hooks:
       - id: flake8
         files: ^backend/
-        args: [--max-line-length=120, --ignore=E203,W503]
+        args:
+          - --max-line-length=120
+          - --ignore=E203,W503
 
   # 3. Bandit (الأمان)
   - repo: https://github.com/PyCQA/bandit
@@ -33,7 +35,8 @@ repos:
     hooks:
       - id: bandit
         files: ^backend/
-        args: [-ll, --skip=B104]
+        args: [-ll]
+        additional_dependencies: [pbr]
 
   # ============================
   # Frontend (JavaScript/TypeScript)

@@ -1,5 +1,5 @@
 from reader import read_data
-from cleaner import detect_datatype, clean_data
+from cleaner import clean_data
 from analyzer import analyze_data
 from report import generate_report
 from tkinter import Tk, filedialog
@@ -27,7 +27,7 @@ df = read_data(file_path)
 
 print("تمت قراءة الملف")
 
-print(detect_datatype(df))
+print(df.dtypes.to_dict())
 
 start_time = time.time()
 
@@ -39,8 +39,6 @@ analysis_after = analyze_data(cleaned_df)
 
 execution_time = round(time.time() - start_time, 2)
 
-report = generate_report(
-    analysis_before, analysis_after, cleaning_report, execution_time
-)
+report = generate_report(analysis_before, analysis_after, cleaning_report, execution_time)
 
 print(report)

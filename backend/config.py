@@ -12,9 +12,11 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 ALLOWED_EXTENSIONS = [".csv", ".xlsx", ".xls"]
 MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB
 
-# CORS: Allow all origins (for production, set CORS_ORIGINS env var)
-# This overrides any environment variable to ensure it works immediately.
-CORS_ORIGINS = ["*"]
+# CORS: restrict to explicit origins via env var. Defaults to local dev origins only.
+CORS_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+).split(",")
 
 # Database URL (optional)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./app.db")

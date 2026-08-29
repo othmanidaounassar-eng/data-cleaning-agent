@@ -1,4 +1,27 @@
-# flyctl launch added from .mypy_cache/.gitignore
-# Automatically created by mypy
+# Keep secrets and user data OUT of the image.
+.env
+.env.*
+**/.env
+
+# Local caches / tooling
 .mypy_cache/**/*
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Fly / Vercel config
 fly.toml
+.vercel/
+
+# User data / artifacts must never be baked into the image
+outputs/
+uploads/
+**/*.csv
+**/*.xlsx
+**/*.xls
+
+# Tests & scratch
+test.csv
+test_pipeline.py
+test_validator.py
