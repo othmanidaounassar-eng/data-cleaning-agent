@@ -86,9 +86,9 @@ def clean_sample_value(val):
 
 def clean_numeric_column(series):
     s = series.astype(str).str.strip()
-    s = s.str.replace(r"[\$,]", "", regex=True)
-    s = s.str.replace(r"\[[^\]]*\]", "", regex=True)
-    s = s.str.replace(r"[a-zA-Z]+$", "", regex=True)
+    s = s.str.replace("$", "", regex=False)
+    s = s.str.replace(",", "", regex=False)
+    s = s.str.replace(r"\[[^\]]*\]|[a-zA-Z]+$", "", regex=True)
     s = s.str.replace(r"[^0-9.\-]", "", regex=True)
     s = s.replace("", np.nan)
     return pd.to_numeric(s, errors="coerce")
@@ -96,9 +96,7 @@ def clean_numeric_column(series):
 
 def clean_text_column(series):
     s = series.astype(str).str.strip()
-    s = s.str.replace(r"[†‡*]", "", regex=True)
-    s = s.str.replace(r"\[\d+\]", "", regex=True)
-    s = s.str.replace(r"\[[a-z]\]", "", regex=True)
+    s = s.str.replace(r"[†‡*]|\[\d+\]|\[[a-z]\]", "", regex=True)
     s = s.str.replace(r"\s+", " ", regex=True)
     s = s.str.strip()
     s = s.replace("", np.nan)
@@ -237,7 +235,17 @@ def clean_data(df):
         if has_currency:
             numeric_like_cols.append(col)
         elif any(
-            kw in col.lower() for kw in ["gross", "salary", "revenue", "amount", "price", "avg", "average", "adjusted"]
+            kw in col.lower()
+            for kw in [
+                "gross",
+                "salary",
+                "revenue",
+                "amount",
+                "price",
+                "avg",
+                "average",
+                "adjusted",
+            ]
         ):
             numeric_like_cols.append(col)
 
@@ -268,7 +276,9 @@ def clean_data(df):
         report["text_columns_cleaned"].append(col)
     if text_cols:
         reason = generate_reason_for_action(
-            "text_cleaning", f"Cleaned {len(text_cols)} text columns.", "Removed special characters and extra spaces."
+            "text_cleaning",
+            f"Cleaned {len(text_cols)} text columns.",
+            "Removed special characters and extra spaces.",
         )
         add_log(
             "text_cleaning",
@@ -297,7 +307,9 @@ def clean_data(df):
             report["datatype_converted"].append(col)
             report["column_conversions"].append({"column": col, "from": "string/range", "to": "numeric (year)"})
             reason = generate_reason_for_action(
-                "type_conversion", f"Extracted year from '{col}' column.", "Converted ranges like '2023–2024' to 2023."
+                "type_conversion",
+                f"Extracted year from '{col}' column.",
+                "Converted ranges like '2023–2024' to 2023.",
             )
             add_log(
                 "type_conversion",
@@ -367,7 +379,9 @@ def clean_data(df):
 
     if total_missing > 0:
         reason = generate_reason_for_action(
-            "missing_values", f"Filled {total_missing} missing values.", "; ".join(missing_details)
+            "missing_values",
+            f"Filled {total_missing} missing values.",
+            "; ".join(missing_details),
         )
         add_log(
             "missing_values",

@@ -5,6 +5,7 @@ import base64
 import json
 import logging
 import os
+import re
 import time
 import uuid
 import traceback
@@ -13,23 +14,33 @@ from io import BytesIO
 import pandas as pd
 from fastapi import FastAPI, UploadFile, File, HTTPException, status, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 from slowapi.middleware import SlowAPIMiddleware
 
-from config import ALLOWED_EXTENSIONS, CORS_ORIGINS, MAX_FILE_SIZE, UPLOAD_FOLDER
+from config import (
+    ALLOWED_EXTENSIONS,
+    CORS_ORIGINS,
+    MAX_COLUMNS,
+    MAX_FILE_SIZE,
+    MAX_ROWS,
+    UPLOAD_FOLDER,
+)
 from cleaner import clean_data, json_safe
 from report import generate_report
 
 # Files this size (or larger) are not embedded as base64 in the JSON response.
 MAX_INLINE_DOWNLOAD_BYTES = 5 * 1024 * 1024  # 5 MB
 
-# Input sanity limits to prevent resource exhaustion.
-MAX_ROWS = 200_000
-MAX_COLUMNS = 500
+# History / reports retention.
 MAX_HISTORY_ITEMS = 20
+
+# Large cleaned files are saved to disk and served via /download/{id} instead of
+# being embedded as base64. TTL for those files.
+_DOWNLOAD_TTL_SECONDS = 60 * 60  # 1 hour
+_DOWNLOAD_ID_RE = re.compile(r"^[0-9a-fA-F]{8}$")
 
 # Simple JSON store for history / reports (persisted under UPLOAD_FOLDER).
 _STORE_PATH = os.path.join(UPLOAD_FOLDER, "_store.json")
@@ -94,6 +105,22 @@ def _save_store(store):
         logger.warning("Failed to persist store to disk.")
 
 
+def _prune_old_downloads(ttl_seconds=_DOWNLOAD_TTL_SECONDS):
+    try:
+        now = time.time()
+        for name in os.listdir(UPLOAD_FOLDER):
+            if not name.startswith("cleaned_"):
+                continue
+            path = os.path.join(UPLOAD_FOLDER, name)
+            try:
+                if now - os.path.getmtime(path) > ttl_seconds:
+                    os.remove(path)
+            except OSError:
+                pass
+    except OSError:
+        pass
+
+
 def _analyze_dataframe(df):
     return {
         "rows": len(df),
@@ -145,6 +172,7 @@ def _read_uploaded_file(file):
 # ✅ نقطة النهاية الرئيسية (مع ظهور الخطأ الكامل)
 # ============================================================
 @app.post("/clean", status_code=status.HTTP_200_OK)
+@app.post("/upload", status_code=status.HTTP_200_OK)
 @limiter.limit("10/minute")
 async def clean_dataset(request: Request, file: UploadFile = File(...)):
     start_time = time.time()
@@ -159,12 +187,20 @@ async def clean_dataset(request: Request, file: UploadFile = File(...)):
         buffer = BytesIO()
         cleaned_df.to_csv(buffer, index=False, encoding="utf-8-sig")
         buffer.seek(0)
-        if buffer.getbuffer().nbytes > MAX_INLINE_DOWNLOAD_BYTES:
-            report["download_url"] = ""
+        buffer_bytes = buffer.getvalue()
+        if len(buffer_bytes) > MAX_INLINE_DOWNLOAD_BYTES:
+            file_id = uuid.uuid4().hex[:8]
+            cleaned_name = f"cleaned_{file_id}.csv"
+            with open(os.path.join(UPLOAD_FOLDER, cleaned_name), "wb") as f:
+                f.write(buffer_bytes)
+            _prune_old_downloads()
+            base = (os.getenv("PUBLIC_BASE_URL", "").rstrip("/")) or str(request.base_url).rstrip("/")
+            report["download_url"] = f"{base}/download/{file_id}"
+            report["cleaned_file_name"] = cleaned_name
         else:
-            csv_base64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+            csv_base64 = base64.b64encode(buffer_bytes).decode("utf-8")
             report["download_url"] = f"data:text/csv;base64,{csv_base64}"
-        report["cleaned_file_name"] = f"cleaned_{uuid.uuid4().hex[:8]}.csv"
+            report["cleaned_file_name"] = f"cleaned_{uuid.uuid4().hex[:8]}.csv"
 
         # Record to local history (best-effort).
         store = _load_store()
@@ -184,6 +220,8 @@ async def clean_dataset(request: Request, file: UploadFile = File(...)):
         _save_store(store)
 
         return JSONResponse(content=json_safe(report))
+    except HTTPException:
+        raise
     except Exception as error:
         # ✅ طباعة الخطأ الكامل في الطرفية فقط (لا يُرسل للمستخدم)
         print("=" * 60)
@@ -196,6 +234,17 @@ async def clean_dataset(request: Request, file: UploadFile = File(...)):
             status_code=500,
             detail="An unexpected error occurred while cleaning. Please try a smaller file or contact support.",
         ) from error
+
+
+@app.get("/download/{file_id}", include_in_schema=False)
+async def download_cleaned(file_id: str):
+    if not _DOWNLOAD_ID_RE.match(file_id):
+        raise HTTPException(status_code=400, detail="Invalid download id.")
+    path = os.path.join(UPLOAD_FOLDER, f"cleaned_{file_id}.csv")
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail="Download expired or not found.")
+    _prune_old_downloads()
+    return FileResponse(path, media_type="text/csv", filename=os.path.basename(path))
 
 
 @app.get("/history", status_code=status.HTTP_200_OK)
@@ -293,7 +342,10 @@ async def http_exception_handler(_, exc):
 @app.exception_handler(Exception)
 async def generic_exception_handler(_, exc):
     logger.error("Unhandled exception: %s", exc, exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": "An unexpected error occurred. Please try again later."})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected error occurred. Please try again later."},
+    )
 
 
 if __name__ == "__main__":
