@@ -14,8 +14,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -167,9 +167,22 @@ bandit-report.json
 # Frontend: Next.js build
 .next/
 out/
+*.tsbuildinfo
 
 # Environment files (مهم جداً)
 .env
 .env.local
 .env.production
 .env*
+
+# =====================================
+# User data / artifacts (sensitive)
+# =====================================
+backend/outputs/
+backend/uploads/
+backend/test.csv
+frontend/test.csv
+**/*.csv
+**/*.xlsx
+**/*.xls
+.opencode/
