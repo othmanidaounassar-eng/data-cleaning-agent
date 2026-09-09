@@ -1,8 +1,10 @@
 // frontend/lib/backend.ts
-import { NextRequest } from "next/server";
-
 export const BACKEND_URL =
   process.env.BACKEND_API_URL || "http://localhost:8000";
+
+export function getBackendUrl(): string {
+  return BACKEND_URL;
+}
 
 // IDs accepted in dynamic URL segments (`[id]` params). Session ids are
 // uuid hex strings; file ids are 8-12 hex chars. Restricting to this safe

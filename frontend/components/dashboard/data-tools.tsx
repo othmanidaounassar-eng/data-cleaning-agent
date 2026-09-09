@@ -23,6 +23,7 @@ import ExcelJS from "exceljs";
 import Papa from "papaparse";
 import { API_ENDPOINTS } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
+import { postCompressedForm } from "@/lib/upload-utils";
 import { useAppSettings } from "@/components/providers/app-providers";
 
 const ACCEPT = ".csv,.xlsx,.xls";
@@ -394,7 +395,6 @@ export function SqlEditorTool() {
   const [headers, setHeaders] = useState<string[]>([]);
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [query, setQuery] = useState("");
-  const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<Record<string, unknown>[] | null>(null);
   const [columns, setColumns] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -802,15 +802,10 @@ export function SqlEditorTool() {
             <button
               type="button"
               onClick={run}
-              disabled={loading}
-              className="flex items-center gap-2 bg-gradient-to-r from-[#0ea5e9] to-[#4f7cff] hover:brightness-110 disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-lg shadow-sky-500/20"
+              className="flex items-center gap-2 bg-gradient-to-r from-[#0ea5e9] to-[#4f7cff] hover:brightness-110 text-white text-sm font-medium px-4 py-2 rounded-xl transition shadow-lg shadow-sky-500/20"
             >
-              {loading ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Play className="w-4 h-4" />
-              )}
-              {loading ? t("sql.running") : t("sql.run")}
+              <Play className="w-4 h-4" />
+              {t("sql.run")}
             </button>
           </div>
 
@@ -1126,15 +1121,21 @@ export function DictionaryTool() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(API_ENDPOINTS.ANALYZE_DATA, {
-        method: "POST",
-        headers: authHeaders(),
-        body: form,
-      });
-      const data = await res.json();
-      if (!res.ok)
-        throw new Error(data.error || data.detail || t("an.analysisError"));
-      const cols: DictRow[] = (data.columns || []).map(
+      const { ok, data } = await postCompressedForm(
+        API_ENDPOINTS.ANALYZE_DATA,
+        form,
+        authHeaders(),
+      );
+      const payload = data as {
+        error?: string;
+        detail?: string;
+        columns?: Record<string, unknown>[];
+      };
+      if (!ok)
+        throw new Error(
+          payload.error || payload.detail || t("an.analysisError"),
+        );
+      const cols: DictRow[] = (payload.columns || []).map(
         (c: Record<string, unknown>) => ({
           name: String(c.name || ""),
           dtype: String(c.dtype || "?"),

@@ -1,33 +1,18 @@
 // frontend/app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { gunzip } from "zlib";
-import { promisify } from "util";
 import { BACKEND_URL, backendHeaders } from "@/lib/backend";
-
-const gunzipAsync = promisify(gunzip);
-const MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
+import { ProxyPayloadError, decompressGzipBody } from "@/lib/proxy-body";
 
 export async function POST(request: NextRequest) {
   try {
-    const isGzip = (request.headers.get("content-encoding") || "").includes(
-      "gzip",
-    );
+    const gzipBody = await decompressGzipBody(request);
 
     let body: BodyInit;
     let contentType = request.headers.get("content-type") || "";
 
-    if (isGzip) {
-      // Compressed multipart: decompress and forward the raw bytes unchanged,
-      // keeping the original multipart boundary so FastAPI parses it natively.
-      const compressed = Buffer.from(await request.arrayBuffer());
-      const raw = await gunzipAsync(compressed);
-      if (raw.length > MAX_DECOMPRESSED_BYTES) {
-        return NextResponse.json(
-          { error: "File exceeds the maximum supported size." },
-          { status: 413 },
-        );
-      }
-      body = new Uint8Array(raw);
+    if (gzipBody) {
+      body = gzipBody.body;
+      contentType = gzipBody.contentType;
     } else {
       const formData = await request.formData();
       const file = formData.get("file");
@@ -85,6 +70,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("❌ Proxy Error:", error);
 
+    if (error instanceof ProxyPayloadError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status },
+      );
+    }
     if (error instanceof Error && error.name === "TimeoutError") {
       return NextResponse.json(
         { error: "الخادم الخلفي استغرق وقتاً طويلاً. حاول مرة أخرى." },

@@ -26,7 +26,8 @@ CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
-    created_at REAL NOT NULL
+    created_at REAL NOT NULL,
+    token_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS chat_sessions (
@@ -92,6 +93,16 @@ def configure(path: str):
         delattr(_local, "conn")
     _DB_PATH = path
     init_db()
+    migrate()
+
+
+def migrate():
+    """Ensure schema is up-to-date (adds missing columns for existing DBs)."""
+    conn = _conn()
+    cols = [r[1] for r in conn.execute("PRAGMA table_info(users)").fetchall()]
+    if "token_version" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 0")
+        conn.commit()
 
 
 def init_db():
@@ -128,6 +139,14 @@ def get_user_by_id(user_id: int):
 def username_exists(username: str) -> bool:
     row = _conn().execute("SELECT 1 FROM users WHERE lower(username) = lower(?)", (username,)).fetchone()
     return row is not None
+
+
+def increment_token_version(user_id: int) -> None:
+    _conn().execute(
+        "UPDATE users SET token_version = token_version + 1 WHERE id = ?",
+        (user_id,),
+    )
+    _conn().commit()
 
 
 # ============================================================

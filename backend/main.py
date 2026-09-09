@@ -92,6 +92,7 @@ app = FastAPI(
     description="Secure and reliable data cleaning service for CSV files.",
     docs_url=None,
     redoc_url=None,
+    openapi_url=None,
 )
 
 # CORS middleware
@@ -109,6 +110,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 # Initialise the SQLite schema + rendering tables.
 try:
     db.init_db()
+    db.migrate()
 except Exception as exc:  # pragma: no cover
     logger.warning("Failed to initialise database: %s", exc)
 
@@ -926,11 +928,15 @@ def _export_df(df, target):
     raise HTTPException(status_code=400, detail=f"Unsupported target format: {target}")
 
 
-def _inline_or_saved(payload_bytes, ext, request):
-    """Embed small payloads in the JSON response; save larger ones to disk."""
-    file_id = uuid.uuid4().hex[:12]
+def _inline_or_saved(payload_bytes, ext, request, user_id):
+    """Embed small payloads in the JSON response; save larger ones to disk.
+
+    Disk files are name-scoped to the owning user (cleaned_{user_id}_{file_id})
+    so /download can enforce ownership without a separate lookup table.
+    """
+    file_id = uuid.uuid4().hex[:8]
+    fname = f"cleaned_{user_id}_{file_id}{ext}"
     if len(payload_bytes) > MAX_INLINE_DOWNLOAD_BYTES:
-        fname = f"cleaned_{file_id}{ext}"
         with open(os.path.join(UPLOAD_FOLDER, fname), "wb") as f:
             f.write(payload_bytes)
         _prune_old_downloads()
@@ -943,7 +949,7 @@ def _inline_or_saved(payload_bytes, ext, request):
     data_url = base64.b64encode(payload_bytes).decode("utf-8")
     return {
         "download_url": f"data:{ext};base64,{data_url}",
-        "download_name": f"cleaned_{file_id}{ext}",
+        "download_name": fname,
         "inline": True,
     }
 
@@ -1093,7 +1099,7 @@ async def merge_files_endpoint(
             merged.columns = _dedupe_column_names(merged.columns)
         cols = [str(c)[:120] for c in merged.columns]
         payload_bytes, ext = await anyio.to_thread.run_sync(_export_df, merged, target)
-        dl = _inline_or_saved(payload_bytes, ext, request)
+        dl = _inline_or_saved(payload_bytes, ext, request, user["id"])
         return JSONResponse(
             content=json_safe(
                 {
@@ -1132,7 +1138,7 @@ async def convert_endpoint(
     try:
         df = await anyio.to_thread.run_sync(_read_uploaded_file, file)
         payload_bytes, ext = await anyio.to_thread.run_sync(_export_df, df, target)
-        dl = _inline_or_saved(payload_bytes, ext, request)
+        dl = _inline_or_saved(payload_bytes, ext, request, user["id"])
         return JSONResponse(
             content=json_safe(
                 {
@@ -1248,7 +1254,7 @@ async def power_pivot_endpoint(
         if len(df) > MAX_ROWS:
             raise HTTPException(status_code=413, detail=f"عدد الصفوف يتجاوز الحد الأقصى ({MAX_ROWS:,}).")
         payload_bytes, model = await anyio.to_thread.run_sync(_build_power_pivot_workbook_df, df)
-        dl = _inline_or_saved(payload_bytes, ".xlsx", request)
+        dl = _inline_or_saved(payload_bytes, ".xlsx", request, user["id"])
         return JSONResponse(
             content=json_safe(
                 {
@@ -1295,9 +1301,9 @@ async def clean_dataset(
         report = await anyio.to_thread.run_sync(_build_report, before, after, cleaning_report, exec_time)
 
         buffer_bytes = await anyio.to_thread.run_sync(_render_csv, cleaned_df)
-        file_id = uuid.uuid4().hex[:12]
+        file_id = uuid.uuid4().hex[:8]
         if len(buffer_bytes) > MAX_INLINE_DOWNLOAD_BYTES:
-            cleaned_name = f"cleaned_{file_id}.csv"
+            cleaned_name = f"cleaned_{user['id']}_{file_id}.csv"
             with open(os.path.join(UPLOAD_FOLDER, cleaned_name), "wb") as f:
                 f.write(buffer_bytes)
             _prune_old_downloads()
@@ -1307,7 +1313,7 @@ async def clean_dataset(
         else:
             csv_base64 = base64.b64encode(buffer_bytes).decode("utf-8")
             report["download_url"] = f"data:text/csv;base64,{csv_base64}"
-            report["cleaned_file_name"] = f"cleaned_{file_id}.csv"
+            report["cleaned_file_name"] = f"cleaned_{user['id']}_{file_id}.csv"
 
         report["file_id"] = file_id
         report["source_file_name"] = file.filename
@@ -1371,17 +1377,15 @@ async def clean_dataset(
 async def download_cleaned(file_id: str, user: dict = Depends(auth.get_current_user)):
     if not _DOWNLOAD_ID_RE.match(file_id):
         raise HTTPException(status_code=400, detail="Invalid download id.")
-    # Ownership check (anti-IDOR): a user may only download files they created.
-    record = await anyio.to_thread.run_sync(db.get_user_file, user["id"], file_id)
-    if record is None:
-        raise HTTPException(status_code=404, detail="Download expired or not found.")
+    # Files are name-scoped to the owning user (cleaned_{user_id}_{id}), so a
+    # caller can only ever reach their own downloads (anti-IDOR).
     for ext, media in (
         (".csv", "text/csv"),
         (".xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
         (".xls", "application/vnd.ms-excel"),
         (".json", "application/json"),
     ):
-        path = os.path.join(UPLOAD_FOLDER, f"cleaned_{file_id}{ext}")
+        path = os.path.join(UPLOAD_FOLDER, f"cleaned_{user['id']}_{file_id}{ext}")
         if os.path.isfile(path):
             _prune_old_downloads()
             return FileResponse(path, media_type=media, filename=os.path.basename(path))

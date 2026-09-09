@@ -271,6 +271,28 @@ class TestCors:
         assert r.status_code == 200
         assert r.headers.get("access-control-allow-origin") == "http://localhost:3000"
 
+    def test_preflight_allows_patch_method(self, client):
+        r = client.options(
+            "/chat/sessions/some-id",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "PATCH",
+            },
+        )
+        assert r.status_code == 200
+        assert "PATCH" in r.headers.get("access-control-allow-methods", "")
+
+    def test_preflight_allows_delete_method(self, client):
+        r = client.options(
+            "/chat/sessions/some-id",
+            headers={
+                "Origin": "http://localhost:3000",
+                "Access-Control-Request-Method": "DELETE",
+            },
+        )
+        assert r.status_code == 200
+        assert "DELETE" in r.headers.get("access-control-allow-methods", "")
+
     def test_unknown_origin_not_allowed(self, client):
         r = client.options(
             "/clean",

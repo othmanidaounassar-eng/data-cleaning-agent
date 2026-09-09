@@ -216,7 +216,7 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))  # 7 days
 # Password policy
 MIN_USERNAME_LEN = int(os.getenv("MIN_USERNAME_LEN", "3"))
-MIN_PASSWORD_LEN = int(os.getenv("MIN_PASSWORD_LEN", "6"))
+MIN_PASSWORD_LEN = int(os.getenv("MIN_PASSWORD_LEN", "10"))
 
 
 # ============================================================

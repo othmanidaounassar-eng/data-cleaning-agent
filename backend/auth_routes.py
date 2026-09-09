@@ -17,11 +17,29 @@ from config import (
 
 router = APIRouter()
 
+
+def _client_key(request: Request) -> str:
+    """Rate-limit key: the originating client IP.
+
+    Behind the Vercel -> Fly proxy the direct TCP peer is a Vercel function
+    egress IP shared by every user, so keying on get_remote_address() would
+    treat all traffic as one actor and lock legitimate users out after a few
+    logins. Prefer the first X-Forwarded-For hop (set by the trusted proxy);
+    fall back to the direct peer for requests that bypass it.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        first = forwarded.split(",")[0].strip()
+        if first:
+            return first
+    return get_remote_address(request)
+
+
 # Single shared limiter. main.py sets app.state.limiter to this instance so
 # the SlowAPIMiddleware enforces the per-route limits below (auth endpoints
 # are throttled tightly to slow brute force / account spamming).
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_client_key,
     default_limits=[RATE_LIMIT_MISC],
     storage_uri="memory://",
 )
@@ -60,7 +78,9 @@ def _validate_password(raw):
 
 
 def _issue(user_id, username):
-    token = auth.create_access_token(user_id)
+    user = db.get_user_by_id(user_id)
+    token_version = user["token_version"] if user else 0
+    token = auth.create_access_token(user_id, token_version)
     return {"token": token, "user": {"id": user_id, "username": username}}
 
 
@@ -92,6 +112,13 @@ async def login(request: Request):
             detail="Invalid username or password.",
         )
     return _issue(user["id"], user["username"])
+
+
+@router.post("/auth/logout", status_code=status.HTTP_200_OK)
+@limiter.limit(RATE_LIMIT_MISC, error_message="Too many logout attempts. Try again later.")
+async def logout(request: Request, user: dict = Depends(auth.get_current_user)):
+    auth.invalidate_user_tokens(user["id"])
+    return {"ok": True}
 
 
 @router.get("/auth/me", status_code=status.HTTP_200_OK)

@@ -6,115 +6,211 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import {
-  AuthUser,
-  authHeaders,
-  clearAuth,
-  getToken,
-  getUser,
-  setToken,
-  setUser,
-} from "@/lib/auth";
+import { useRouter } from "next/navigation";
+import { Lang, Theme, translate } from "@/lib/i18n";
+import { getBackendUrl } from "@/lib/backend";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL
-  ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
-  : "/api";
+const TOKEN_KEY = "oqzaro:token";
+const USER_KEY = "oqzaro:user";
+const THEME_KEY = "oqzaro:theme";
+const LANG_KEY = "oqzaro:lang";
 
-interface AuthContextValue {
-  user: AuthUser | null;
-  loading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+interface User {
+  id: number;
+  username: string;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+interface AuthState {
+  userState: User | null;
+  userLoading: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  clearSession: () => void;
+}
+
+const AuthContext = createContext<AuthState | null>(null);
+
+function readStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function readStoredUser(): User | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function persistSession(token: string, user: User) {
+  try {
+    window.localStorage.setItem(TOKEN_KEY, token);
+    window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  } catch {
+    // ignore storage errors
+  }
+}
+
+function clearStoredSession() {
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+    window.localStorage.removeItem(USER_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUserState] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [userState, setUserState] = useState<User | null>(readStoredUser());
+  const [userLoading, setUserLoading] = useState(!readStoredUser());
+  const router = useRouter();
+  const logoutRef = useRef(false);
 
   useEffect(() => {
-    // Restore a previously stored session, then verify it with the backend.
-    const storedUser = getUser();
-    const token = getToken();
-    if (storedUser && token) {
-      setUserState(storedUser);
+    const token = readStoredToken();
+    const stored = readStoredUser();
+    if (!token || !stored) {
+      setUserState(null);
+      setUserLoading(false);
+      return;
     }
-    if (token) {
-      fetch(`${API_BASE}/auth/me`, {
-        headers: authHeaders(),
-      })
-        .then((res) => {
-          if (res.ok) return res.json();
-          clearAuth();
-          setUserState(null);
-          return null;
-        })
-        .then((data) => {
-          if (data?.user) {
-            setUserState(data.user);
-            setUser(data.user);
+    const verify = async () => {
+      try {
+        const backend = getBackendUrl();
+        const res = await fetch(`${backend}/auth/me`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setUserState(data.user);
+        } else {
+          if (res.status === 401) {
+            clearStoredSession();
+            setUserState(null);
+            redirectOn401();
           }
-        })
-        .catch(() => {
-          // network error — keep local session optimistically
-        })
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+        }
+      } catch {
+        // offline, keep stored session
+      } finally {
+        setUserLoading(false);
+      }
+    };
+    verify();
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.detail || data.error || "Login failed");
+  const redirectOn401 = useCallback(() => {
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    const current = url.pathname;
+    if (!current.startsWith("/login") && !current.startsWith("/auth")) {
+      router.replace(`/login?from=${encodeURIComponent(current)}`);
     }
-    setToken(data.token);
-    setUser(data.user);
-    setUserState(data.user);
-  }, []);
+  }, [router]);
 
-  const register = useCallback(async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE}/auth/register`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data.detail || data.error || "Registration failed");
+  const login = useCallback(
+    async (username: string, password: string) => {
+      const backend = getBackendUrl();
+      const res = await fetch(`${backend}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Login failed");
+      }
+      const data = await res.json();
+      const token = data.token;
+      const user = data.user;
+      persistSession(token, user);
+      setUserState(user);
+      router.push("/dashboard");
+    },
+    [router],
+  );
+
+  const register = useCallback(
+    async (username: string, password: string) => {
+      const backend = getBackendUrl();
+      const res = await fetch(`${backend}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Registration failed");
+      }
+      const data = await res.json();
+      const token = data.token;
+      const user = data.user;
+      persistSession(token, user);
+      setUserState(user);
+      router.push("/dashboard");
+    },
+    [router],
+  );
+
+  const logout = useCallback(async () => {
+    if (logoutRef.current) return;
+    logoutRef.current = true;
+    try {
+      const token = readStoredToken();
+      if (token) {
+        const backend = getBackendUrl();
+        await fetch(`${backend}/auth/logout`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch(() => {});
+      }
+    } catch {
+      // ignore network errors during logout
+    } finally {
+      logoutRef.current = false;
+      clearStoredSession();
+      setUserState(null);
+      router.replace("/login");
     }
-    setToken(data.token);
-    setUser(data.user);
-    setUserState(data.user);
-  }, []);
+  }, [router]);
 
-  const logout = useCallback(() => {
-    clearAuth();
+  const clearSession = useCallback(() => {
+    clearStoredSession();
     setUserState(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, register, logout }),
-    [user, loading, login, register, logout],
+    () => ({
+      userState,
+      userLoading,
+      login,
+      register,
+      logout,
+      clearSession,
+    }),
+    [userState, userLoading, login, register, logout, clearSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth(): AuthContextValue {
+export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (!ctx) {
     throw new Error("useAuth must be used within <AuthProvider>");
   }
   return ctx;
 }
+
+export { type User };

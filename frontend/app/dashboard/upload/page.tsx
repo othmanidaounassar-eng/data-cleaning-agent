@@ -21,7 +21,7 @@ import {
 import { API_ENDPOINTS } from "@/lib/api";
 import { authHeaders } from "@/lib/auth";
 import { saveChatContext } from "@/lib/chat";
-import { buildUploadPayload } from "@/lib/upload-utils";
+import { buildUploadPayload, cleanFileViaUpload } from "@/lib/upload-utils";
 import {
   downloadPdfFromUploadResult,
   UploadResultLike,
@@ -145,53 +145,17 @@ export default function UploadPage() {
     f: SelectedFile,
     planJson: string,
     onProgress?: (pct: number) => void,
-  ): Promise<CleaningResult> => {
-    const payload = await buildUploadPayload(f.file, planJson);
-    const url = API_ENDPOINTS.UPLOAD;
-
-    return new Promise<CleaningResult>((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", url, true);
-      xhr.setRequestHeader("Content-Type", payload.contentType);
-      for (const [key, value] of Object.entries(payload.headers)) {
-        xhr.setRequestHeader(key, value);
-      }
-      for (const [key, value] of Object.entries(authHeaders())) {
-        xhr.setRequestHeader(key, value);
-      }
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          onProgress?.(Math.round((event.loaded / event.total) * 100));
-        }
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            const data = JSON.parse(xhr.responseText);
-            resolve(data as CleaningResult);
-          } catch {
-            reject(new Error(t("upload.serverError")));
-          }
-        } else {
-          let msg = `Upload failed (${xhr.status})`;
-          try {
-            const err = JSON.parse(xhr.responseText);
-            if (err.detail) msg = err.detail;
-            else if (err.error) msg = err.error;
-          } catch {
-            if (/Request Entity Too Large/i.test(xhr.responseText)) {
-              msg = t("upload.fileTooLarge");
-            }
-          }
-          reject(new Error(msg));
-        }
-      };
-      xhr.onerror = () => reject(new Error(t("upload.network")));
-      xhr.ontimeout = () => reject(new Error(t("upload.timeout")));
-      xhr.timeout = 300000;
-      xhr.send(payload.body);
-    });
-  };
+  ): Promise<CleaningResult> =>
+    (await cleanFileViaUpload(f.file, planJson, {
+      onProgress,
+      timeoutMs: 300000,
+      label: {
+        generic: t("upload.serverError"),
+        conn: t("upload.network"),
+        timeout: t("upload.timeout"),
+        tooLarge: t("upload.fileTooLarge"),
+      },
+    })) as CleaningResult;
 
   // ---- Analyze a single file (stores the cleaning plan for approval) ----
   const analyzeFile = async (f: SelectedFile) => {

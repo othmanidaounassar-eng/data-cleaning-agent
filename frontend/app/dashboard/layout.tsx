@@ -92,7 +92,15 @@ export default function DashboardLayout({
     }
   }, [loading, user, setupDone, activeWork, pathname, router]);
 
-  if (loading || !user) {
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg)] text-[var(--text)] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#4f7cff]/40 border-t-[#4f7cff] animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
     return null;
   }
 

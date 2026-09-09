@@ -291,6 +291,7 @@ def _expect_big_reject(filename):
 # ============================================================
 
 
+@pytest.mark.slow
 class TestStress100Files:
     def test_generated_100_files(self):
         assert len(STRESS_CASES) >= 100, f"generated {len(STRESS_CASES)} files"
@@ -394,7 +395,7 @@ class TestStress100Files:
             # Download URL must be present and valid.
             if "download_url" in body and body["download_url"].startswith("data:"):
                 b64 = body["download_url"].split(",", 1)[1]
-                assert b64.startswith("") or True  # base64 content present
+                assert b64, f"{name}: empty base64 payload"
                 try:
                     csv_bytes = base64.b64decode(b64)
                     assert len(csv_bytes) > 0

@@ -51,7 +51,7 @@ import {
 } from "lucide-react";
 import { authHeaders } from "@/lib/auth";
 import { API_ENDPOINTS } from "@/lib/api";
-import { buildUploadPayload, compressFormData } from "@/lib/upload-utils";
+import { cleanFileViaUpload, compressFormData } from "@/lib/upload-utils";
 import { useAppSettings } from "@/components/providers/app-providers";
 import { MergeTool, ConvertTool } from "@/components/dashboard/file-tools";
 import {
@@ -313,40 +313,16 @@ export default function AnalyzePage() {
     }
   };
 
-  const postClean = async (
+  const postClean = (
     target: File,
     planJson: string,
-  ): Promise<CleaningResultT> => {
-    const payload = await buildUploadPayload(target, planJson);
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", API_ENDPOINTS.UPLOAD);
-      xhr.setRequestHeader("Content-Type", payload.contentType);
-      for (const [key, value] of Object.entries(payload.headers)) {
-        xhr.setRequestHeader(key, value);
-      }
-      xhr.setRequestHeader(
-        "Authorization",
-        `Bearer ${localStorage.getItem("token") || ""}`,
-      );
-      xhr.responseType = "json";
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
-          resolve(xhr.response);
-        } else {
-          reject(
-            new Error(
-              xhr.response?.error ||
-                xhr.response?.detail ||
-                t("an.analysisError"),
-            ),
-          );
-        }
-      };
-      xhr.onerror = () => reject(new Error(t("an.connFailed")));
-      xhr.send(payload.body);
-    });
-  };
+  ): Promise<CleaningResultT> =>
+    cleanFileViaUpload(target, planJson, {
+      label: {
+        generic: t("an.analysisError"),
+        conn: t("an.connFailed"),
+      },
+    }) as Promise<CleaningResultT>;
 
   const fetchCleanedFile = async (
     cleanResult: CleaningResultT,

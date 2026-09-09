@@ -29,9 +29,9 @@ type SessionSummary = {
   updated_at: number;
 };
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL
-  ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
-  : "/api";
+// All API traffic goes through the same-origin /api proxy routes (see
+// lib/api.ts); keep them consistent so chat never bypasses the proxy.
+const API_BASE = "/api";
 
 /* ─── Simple markdown renderer (no deps) ──────────────────────────── */
 

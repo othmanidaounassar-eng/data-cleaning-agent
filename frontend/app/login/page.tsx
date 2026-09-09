@@ -1,7 +1,7 @@
 ﻿"use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Sparkles } from "lucide-react";
 import { useAuth } from "@/components/providers/auth-provider";
@@ -9,6 +9,8 @@ import { useAuth } from "@/components/providers/auth-provider";
 export default function LoginPage() {
   const { login, register } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const from = searchParams.get("from") || "/dashboard";
   const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +27,7 @@ export default function LoginPage() {
       } else {
         await register(username, password);
       }
-      router.push("/dashboard");
+      router.push(from);
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
@@ -124,8 +126,12 @@ export default function LoginPage() {
                 className={inputCls}
                 placeholder="••••••••"
               />
-              {mode === "register" && (
-                <p className="text-xs text-white/40 mt-1">6 أحرف على الأقل</p>
+              {password && (
+                <p className="text-xs text-white/40 mt-1">
+                  {mode === "register"
+                    ? "10 أحرف على الأقل"
+                    : "لا تظهر كلمة المرور للعلن"}
+                </p>
               )}
             </div>
 
