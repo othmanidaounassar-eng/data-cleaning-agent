@@ -51,6 +51,7 @@ import {
 } from "lucide-react";
 import { authHeaders } from "@/lib/auth";
 import { API_ENDPOINTS } from "@/lib/api";
+import { buildUploadPayload, compressFormData } from "@/lib/upload-utils";
 import { useAppSettings } from "@/components/providers/app-providers";
 import { MergeTool, ConvertTool } from "@/components/dashboard/file-tools";
 import {
@@ -285,10 +286,19 @@ export default function AnalyzePage() {
           ? extraRules
           : rules.filter((r) => r.value && String(r.value).length);
       if (active.length) form.append("filters", JSON.stringify(active));
+      const {
+        body,
+        headers: compHeaders,
+        contentType,
+      } = await compressFormData(form);
       const res = await fetch(API_ENDPOINTS.ANALYZE_DATA, {
         method: "POST",
-        headers: authHeaders(),
-        body: form,
+        headers: {
+          "Content-Type": contentType,
+          ...authHeaders(),
+          ...compHeaders,
+        },
+        body,
       });
       const data = await res.json();
       if (!res.ok) {
@@ -303,16 +313,18 @@ export default function AnalyzePage() {
     }
   };
 
-  const postClean = (
+  const postClean = async (
     target: File,
     planJson: string,
-  ): Promise<CleaningResultT> =>
-    new Promise((resolve, reject) => {
+  ): Promise<CleaningResultT> => {
+    const payload = await buildUploadPayload(target, planJson);
+    return new Promise((resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      const form = new FormData();
-      form.append("file", target);
-      form.append("plan", planJson);
       xhr.open("POST", API_ENDPOINTS.UPLOAD);
+      xhr.setRequestHeader("Content-Type", payload.contentType);
+      for (const [key, value] of Object.entries(payload.headers)) {
+        xhr.setRequestHeader(key, value);
+      }
       xhr.setRequestHeader(
         "Authorization",
         `Bearer ${localStorage.getItem("token") || ""}`,
@@ -332,8 +344,9 @@ export default function AnalyzePage() {
         }
       };
       xhr.onerror = () => reject(new Error(t("an.connFailed")));
-      xhr.send(form);
+      xhr.send(payload.body);
     });
+  };
 
   const fetchCleanedFile = async (
     cleanResult: CleaningResultT,
@@ -366,10 +379,19 @@ export default function AnalyzePage() {
     try {
       const form = new FormData();
       form.append("file", file);
+      const {
+        body,
+        headers: compHeaders,
+        contentType,
+      } = await compressFormData(form);
       const res = await fetch(API_ENDPOINTS.ANALYZE, {
         method: "POST",
-        headers: authHeaders(),
-        body: form,
+        headers: {
+          "Content-Type": contentType,
+          ...authHeaders(),
+          ...compHeaders,
+        },
+        body,
       });
       const data = await res.json();
       if (!res.ok) {

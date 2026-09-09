@@ -21,13 +21,26 @@ export async function buildUploadPayload(
   fd.append("file", file, file.name);
   fd.append("plan", plan);
 
-  const serialized = new Response(fd);
+  return compressFormData(fd);
+}
+
+// Compress any FormData with gzip when the browser supports CompressionStream
+// and the payload exceeds MIN_GZIP_BYTES. Returns the body, the original
+// multipart content-type (boundary included), and headers to merge into the
+// fetch request (Content-Encoding: gzip when compressed).
+export async function compressFormData(form: FormData): Promise<UploadPayload> {
+  const serialized = new Response(form);
   const contentType = serialized.headers.get("content-type") || "";
   const bytes = new Uint8Array(await serialized.arrayBuffer());
 
   const canCompress = typeof CompressionStream !== "undefined";
   if (!canCompress || bytes.byteLength < MIN_GZIP_BYTES) {
-    return { body: bytes.buffer, contentType, headers: {}, compressed: false };
+    return {
+      body: bytes.buffer,
+      contentType,
+      headers: {},
+      compressed: false,
+    };
   }
 
   const compressed = await new Response(
