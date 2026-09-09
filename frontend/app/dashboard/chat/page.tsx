@@ -29,10 +29,9 @@ type SessionSummary = {
   updated_at: number;
 };
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
-    : "") + "/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
+  : "/api";
 
 /* ─── Simple markdown renderer (no deps) ──────────────────────────── */
 

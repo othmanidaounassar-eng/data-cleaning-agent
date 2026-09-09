@@ -117,6 +117,49 @@ def test_chat_sessions_isolated_between_users(client):
     assert r.status_code == 404
 
 
+def test_chat_session_rename(client):
+    token = _auth(client)
+    r = client.post(
+        "/chat/sessions",
+        headers={"Authorization": token},
+        json={"title": "Original"},
+    )
+    assert r.status_code == 201
+    sid = r.json()["session"]["id"]
+
+    r = client.patch(
+        f"/chat/sessions/{sid}",
+        headers={"Authorization": token},
+        json={"title": "Renamed"},
+    )
+    assert r.status_code == 200
+    assert r.json()["session"]["title"] == "Renamed"
+
+    # missing title -> 400
+    r = client.patch(
+        f"/chat/sessions/{sid}",
+        headers={"Authorization": token},
+        json={},
+    )
+    assert r.status_code == 400
+
+    # empty title -> 400
+    r = client.patch(
+        f"/chat/sessions/{sid}",
+        headers={"Authorization": token},
+        json={"title": "   "},
+    )
+    assert r.status_code == 400
+
+    # unknown session -> 404
+    r = client.patch(
+        "/chat/sessions/doesnotexist",
+        headers={"Authorization": token},
+        json={"title": "x"},
+    )
+    assert r.status_code == 404
+
+
 def test_authenticated_clean_works(client, sample_csv):
     token = _auth(client)
     r = client.post(

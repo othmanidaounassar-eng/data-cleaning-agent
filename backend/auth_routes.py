@@ -121,6 +121,22 @@ async def get_conversation(session_id: str, user: dict = Depends(auth.get_curren
     return {"session": session, "messages": messages}
 
 
+@router.patch("/chat/sessions/{session_id}", status_code=status.HTTP_200_OK)
+async def rename_conversation(
+    session_id: str,
+    request: Request,
+    user: dict = Depends(auth.get_current_user),
+):
+    payload = await _read_json_body(request)
+    title = str(payload.get("title") or "").strip()[:120]
+    if not title:
+        raise HTTPException(status_code=400, detail="Title is required.")
+    if not db.rename_session(user["id"], session_id, title):
+        raise HTTPException(status_code=404, detail="Conversation not found.")
+    session = db.get_session(user["id"], session_id)
+    return {"session": session}
+
+
 @router.delete("/chat/sessions/{session_id}", status_code=status.HTTP_200_OK)
 async def delete_conversation(session_id: str, user: dict = Depends(auth.get_current_user)):
     if not db.delete_session(user["id"], session_id):

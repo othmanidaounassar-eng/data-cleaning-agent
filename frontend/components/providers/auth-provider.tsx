@@ -18,10 +18,9 @@ import {
   setUser,
 } from "@/lib/auth";
 
-const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL
-    ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
-    : "") + "/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL
+  ? process.env.NEXT_PUBLIC_API_URL.trim().replace(/\/+$/, "")
+  : "/api";
 
 interface AuthContextValue {
   user: AuthUser | null;
