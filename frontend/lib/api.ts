@@ -13,8 +13,15 @@ export const API_BASE = API_BASE_URL ? normalizeBaseUrl(API_BASE_URL) : "/api";
 export const API_ENDPOINTS = {
   UPLOAD: `${API_BASE}/upload`,
   CLEAN: `${API_BASE}/clean`,
+  ANALYZE: `${API_BASE}/analyze`,
+  ANALYZE_DATA: `${API_BASE}/analyze-data`,
+  MERGE_FILES: `${API_BASE}/merge-files`,
+  CONVERT: `${API_BASE}/convert`,
+  POWER_PIVOT: `${API_BASE}/power-pivot`,
   HISTORY: `${API_BASE}/history`,
   REPORT: `${API_BASE}/report`,
+  CHAT: `${API_BASE}/chat`,
+  FILES: `${API_BASE}/files`,
 } as const;
 
 if (typeof window !== "undefined") {

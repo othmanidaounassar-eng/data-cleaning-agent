@@ -1,0 +1,11 @@
+.venv
+backend
+node_modules
+.opencode
+.idea
+.env.local
+.git
+*.log
+_*.csv
+_*.py
+_*.json

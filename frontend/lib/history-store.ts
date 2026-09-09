@@ -34,6 +34,7 @@ export function saveHistory(history: HistoryEntry[]) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
   } catch (error) {
     // إذا فشل التخزين (QuotaExceededError)، احذف نصف العناصر وحاول مرة أخرى
+    void error;
     console.warn("Storage quota exceeded, clearing old history...");
     const current = getHistory();
     const reduced = current.slice(0, Math.floor(current.length / 2));

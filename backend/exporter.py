@@ -3,10 +3,12 @@ import time
 import base64
 from io import StringIO
 
+from cleaner import sanitize_dataframe_for_export
+
 
 def df_to_csv_text(df):
     buffer = StringIO()
-    df.to_csv(buffer, index=False)
+    sanitize_dataframe_for_export(df).to_csv(buffer, index=False)
     return "\ufeff" + buffer.getvalue()
 
 
@@ -20,5 +22,5 @@ def save_output(df, output_folder, original_filename=None):
     timestamp = int(time.time())
     filename = f"cleaned_{timestamp}.csv"
     file_path = os.path.join(output_folder, filename)
-    df.to_csv(file_path, index=False, encoding="utf-8-sig")
+    sanitize_dataframe_for_export(df).to_csv(file_path, index=False, encoding="utf-8-sig")
     return file_path

@@ -11,17 +11,17 @@ const config: Config = {
     extend: {
       colors: {
         base: {
-          950: "#07090F",
-          900: "#0B0E16",
-          850: "#10141F",
-          800: "#151A28",
-          700: "#1D2333",
-          600: "#2A3145",
+          950: "rgb(var(--base-950) / <alpha-value>)",
+          900: "rgb(var(--base-900) / <alpha-value>)",
+          850: "rgb(var(--base-850) / <alpha-value>)",
+          800: "rgb(var(--base-800) / <alpha-value>)",
+          700: "rgb(var(--base-700) / <alpha-value>)",
+          600: "rgb(var(--base-600) / <alpha-value>)",
         },
         ink: {
-          100: "#EDEFF5",
-          300: "#B7BDCC",
-          500: "#8891A5",
+          100: "rgb(var(--ink-100) / <alpha-value>)",
+          300: "rgb(var(--ink-300) / <alpha-value>)",
+          500: "rgb(var(--ink-500) / <alpha-value>)",
         },
         accent: {
           blue: "#4F7CFF",
@@ -36,8 +36,18 @@ const config: Config = {
         },
       },
       fontFamily: {
-        display: ["var(--font-display)", "system-ui", "sans-serif"],
-        body: ["var(--font-body)", "system-ui", "sans-serif"],
+        display: [
+          "var(--font-display)",
+          "var(--font-arabic)",
+          "system-ui",
+          "sans-serif",
+        ],
+        body: [
+          "var(--font-body)",
+          "var(--font-arabic)",
+          "system-ui",
+          "sans-serif",
+        ],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       backgroundImage: {

@@ -1,8 +1,8 @@
-# AI Data Cleaning Agent
+# OQZARO Data Analysis Agent
 
 A production-styled SaaS dashboard for uploading, validating, cleaning, and
-reporting on datasets (CSV / Excel). Built with Next.js 14 (App Router),
-TypeScript, Tailwind CSS, and Framer Motion. The upload flow now talks to a
+reporting on datasets (CSV / Excel). Built with Next.js 16 (App Router),
+TypeScript, Tailwind CSS, and Framer Motion. The upload flow talks to a
 real FastAPI backend; authentication is a mock service ready to be swapped
 for a real one.
 

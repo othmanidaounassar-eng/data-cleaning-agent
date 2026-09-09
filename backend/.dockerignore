@@ -1,27 +1,30 @@
-# Keep secrets and user data OUT of the image.
 .env
 .env.*
 **/.env
 
-# Local caches / tooling
-.mypy_cache/**/*
-__pycache__/
+.mypy_cache
+__pycache__
 *.pyc
 .venv/
 venv/
 
-# Fly / Vercel config
 fly.toml
 .vercel/
+.vercelignore
 
-# User data / artifacts must never be baked into the image
 outputs/
 uploads/
-**/*.csv
-**/*.xlsx
-**/*.xls
+data/
+reports/
 
-# Tests & scratch
+*.csv
+*.xlsx
+*.xls
+
 test.csv
 test_pipeline.py
 test_validator.py
+_test_*.py
+timing.log
+
+_docker_build.log

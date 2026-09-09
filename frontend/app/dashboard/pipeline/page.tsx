@@ -1,0 +1,2524 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  UploadCloud,
+  Loader2,
+  Sparkles,
+  AlertTriangle,
+  ShieldCheck,
+  Activity,
+  Lightbulb,
+  CheckCircle2,
+  RefreshCcw,
+  FileDown,
+  FileText,
+  Presentation,
+  FileCode,
+  FileJson,
+  Eye,
+  Layers,
+  Trophy,
+  GitCompareArrows,
+  PieChart as PieIcon,
+  Link2,
+  Wand2,
+  TrendingUp,
+  Info,
+  ChevronRight,
+  ChevronLeft,
+  Table2,
+  X,
+  FileSpreadsheet,
+  File as FileIcon,
+  Palette,
+  GraduationCap,
+  CalendarClock,
+  CalendarPlus,
+  Clock,
+} from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  PieChart,
+  Pie,
+  Legend,
+  ScatterChart,
+  Scatter,
+  ZAxis,
+  CartesianGrid,
+} from "recharts";
+import { authHeaders } from "@/lib/auth";
+import { API_ENDPOINTS } from "@/lib/api";
+import { useAppSettings } from "@/components/providers/app-providers";
+import { useWorkspaces } from "@/components/providers/workspace-provider";
+import {
+  UploadResultLike,
+  ReportTheme,
+  ReportDesign,
+  REPORT_DESIGNS,
+  downloadExcelResult,
+  downloadSqlResult,
+  downloadPowerpointResult,
+  downloadPdfFromUploadResult,
+} from "@/lib/export-utils";
+import {
+  ScheduledReport,
+  ScheduleFrequency,
+  readScheduled,
+  addSchedule,
+  removeSchedule,
+  postponeSchedule,
+  frequencyLabelKey,
+} from "@/lib/scheduler";
+
+const BAR_COLORS = [
+  "#4f7cff",
+  "#8b5cf6",
+  "#fbbf24",
+  "#60a5fa",
+  "#a78bfa",
+  "#34d399",
+  "#f472b6",
+  "#22d3ee",
+];
+const PIE_COLORS = [
+  "#4f7cff",
+  "#60a5fa",
+  "#34d399",
+  "#fbbf24",
+  "#a78bfa",
+  "#f472b6",
+  "#22d3ee",
+  "#8b5cf6",
+];
+
+const tooltipStyle = {
+  background: "rgba(10,15,30,0.95)",
+  border: "1px solid rgba(255,255,255,0.15)",
+  borderRadius: 12,
+  fontSize: 12,
+};
+
+interface PlanItem {
+  id: string;
+  title: string;
+  side?: "clean" | "keep";
+  summary?: string;
+  reason?: string;
+  run?: boolean;
+}
+
+interface ColumnStat {
+  name: string;
+  dtype: string;
+  nulls: number;
+  distinct: number;
+  min?: number;
+  max?: number;
+  mean?: number;
+  median?: number;
+  std?: number;
+  q1?: number;
+  q3?: number;
+  skewness?: number;
+  outliers_count?: number;
+  outliers_pct?: number;
+  boxplot?: Record<string, number>;
+  histogram?: { bin: number; count: number }[];
+  top_values?: { value: string; count: number }[];
+  description?: string;
+}
+
+interface Kpis {
+  rows: number;
+  columns: number;
+  missing_values: number;
+  missing_pct: number;
+  duplicate_rows: number;
+  duplicate_pct: number;
+  completeness_score: number;
+  quality_score: number;
+  numeric_columns: number;
+  categorical_columns: number;
+}
+
+interface GroupCell {
+  column: string;
+  groups: { value: string | number; count: number; pct?: number }[];
+}
+
+interface HighestCell {
+  column: string;
+  kind: "numeric" | "categorical";
+  max?: number;
+  min?: number;
+  top: { value: string | number; count: number }[];
+}
+
+interface AnalysisResult {
+  dataset?: { file_name?: string };
+  rows: number;
+  column_count: number;
+  total_nulls: number;
+  total_duplicates: number;
+  numeric_columns: number;
+  correlation?: { row: string; col: string; value: number }[];
+  columns?: ColumnStat[];
+  kpis?: Kpis;
+  group_by?: GroupCell[];
+  highest?: HighestCell[];
+  insights?: string[];
+  recommendations?: string[];
+  scatter?: {
+    x_col: string;
+    y_col: string;
+    points: { x: number; y: number }[];
+  }[];
+  sample?: Array<Record<string, unknown>>;
+  column_types?: Record<string, { count: number; columns: string[] }>;
+  ai_explanation?: string;
+  charts?: {
+    histograms?: { column: string; title: string; image: string }[];
+    boxplots?: { column: string; title: string; image: string }[];
+    group_by?: { column: string; title: string; image: string }[];
+    scatter?: {
+      x_column: string;
+      y_column: string;
+      title: string;
+      image: string;
+    }[];
+    heatmap?: { title: string; image: string };
+  };
+}
+
+type CleaningResultT = UploadResultLike & {
+  download_url?: string;
+  cleaned_file_name?: string;
+  file_id?: string;
+};
+
+const STEPS = [
+  { key: "pipe.stepGoal", icon: UploadCloud },
+  { key: "pipe.stepUnderstand", icon: Sparkles },
+  { key: "pipe.stepAsk", icon: Lightbulb },
+  { key: "pipe.stepPlan", icon: AlertTriangle },
+  { key: "pipe.stepClean", icon: ShieldCheck },
+  { key: "pipe.stepAnalysis", icon: Activity },
+  { key: "pipe.stepCharts", icon: PieIcon },
+  { key: "pipe.stepReport", icon: FileText },
+] as const;
+
+const GOAL_CHIPS = ["agent.goalChip1", "agent.goalChip2", "agent.goalChip3"];
+
+type AnalysisMode = "auto" | "manual";
+
+type AnalysisModuleId =
+  | "kpis"
+  | "group"
+  | "highest"
+  | "correlation"
+  | "insights";
+
+const ANALYSIS_MODULES: {
+  id: AnalysisModuleId;
+  labelKey: string;
+  icon: typeof Activity;
+}[] = [
+  { id: "kpis", labelKey: "an.kpis", icon: Activity },
+  { id: "group", labelKey: "an.groupBy", icon: Layers },
+  { id: "highest", labelKey: "an.topValues", icon: Trophy },
+  { id: "correlation", labelKey: "an.tabCorrelation", icon: GitCompareArrows },
+  { id: "insights", labelKey: "an.insights", icon: Lightbulb },
+];
+
+interface ChartTypeDef {
+  id: string;
+  labelKey: string;
+  whyKey: string;
+}
+
+const CHART_TYPES: ChartTypeDef[] = [
+  { id: "histogram", labelKey: "an.histograms", whyKey: "agent.whyHistogram" },
+  { id: "boxplot", labelKey: "an.boxplots", whyKey: "agent.whyOutliers" },
+  { id: "groupby", labelKey: "an.groupBy", whyKey: "agent.whyGroupBy" },
+  { id: "scatter", labelKey: "an.scatterPlot", whyKey: "agent.whyScatter" },
+  {
+    id: "heatmap",
+    labelKey: "an.tabCorrelation",
+    whyKey: "agent.whyCorrelation",
+  },
+  { id: "pie", labelKey: "an.pieChart", whyKey: "agent.whyPie" },
+  { id: "line", labelKey: "an.lineChart", whyKey: "agent.whyLine" },
+  { id: "area", labelKey: "an.areaChart", whyKey: "agent.whyArea" },
+];
+
+export default function PipelinePage() {
+  const { t } = useAppSettings();
+  const { activeWork } = useWorkspaces();
+  const workId = activeWork?.id ?? "default";
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const [files, setFiles] = useState<File[]>([]);
+  const [goal, setGoal] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [activeStep, setActiveStep] = useState(0);
+  const [merging, setMerging] = useState(false);
+
+  const [planItems, setPlanItems] = useState<PlanItem[] | null>(null);
+  const [planLoaded, setPlanLoaded] = useState(false);
+  const [readResult, setReadResult] = useState<AnalysisResult | null>(null);
+  const [cleanedReady, setCleanedReady] = useState(false);
+  const [cleaning, setCleaning] = useState(false);
+  const [analysisTab, setAnalysisTab] = useState<
+    "kpis" | "group" | "highest" | "correlation" | "insights"
+  >("kpis");
+  const [selectedCharts, setSelectedCharts] = useState<Set<string>>(new Set());
+
+  // Auto vs Manual analysis mode
+  const [analysisMode, setAnalysisMode] = useState<AnalysisMode>("auto");
+  const [selectedModules, setSelectedModules] = useState<Set<AnalysisModuleId>>(
+    new Set(ANALYSIS_MODULES.map((m) => m.id)),
+  );
+  const [enabledCharts, setEnabledCharts] = useState<Set<string>>(
+    new Set(CHART_TYPES.map((c) => c.id)),
+  );
+  const [chartNames, setChartNames] = useState<Record<string, string>>({});
+
+  // Report design customization
+  const [reportTheme, setReportTheme] = useState<ReportTheme>("pro");
+  const [reportColor, setReportColor] = useState<string>("#4f7cff");
+
+  // Companion mode for beginners
+  const [companionMode, setCompanionMode] = useState(false);
+
+  // Scheduled reports (advanced)
+  const [scheduled, setScheduled] = useState<ScheduledReport[]>([]);
+  const [schedFreq, setSchedFreq] = useState<ScheduleFrequency>("weekly");
+  const [schedFormat, setSchedFormat] = useState<"excel" | "ppt" | "pdf">(
+    "ppt",
+  );
+  const [schedEmail, setSchedEmail] = useState<string>("");
+  const [schedTelegram, setSchedTelegram] = useState<string>("");
+  const [schedSaved, setSchedSaved] = useState(false);
+
+  const canSubmit = files.length > 0 || loading;
+
+  const toggleModule = (id: AnalysisModuleId) => {
+    setSelectedModules((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleChartType = (id: string) => {
+    setEnabledCharts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const addFiles = (newFiles: FileList | null) => {
+    if (!newFiles) return;
+    const arr = Array.from(newFiles);
+    setFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name));
+      const merged = [...prev];
+      for (const f of arr) {
+        if (!existing.has(f.name)) merged.push(f);
+      }
+      return merged;
+    });
+  };
+
+  const removeFile = (name: string) => {
+    setFiles((prev) => prev.filter((f) => f.name !== name));
+  };
+
+  const getFileIcon = (name: string) => {
+    if (name.endsWith(".csv")) return FileText;
+    if (name.endsWith(".xlsx") || name.endsWith(".xls")) return FileSpreadsheet;
+    return FileIcon;
+  };
+
+  const runRead = async () => {
+    if (files.length === 0) return;
+    setLoading(true);
+    setError("");
+    setCleanedReady(false);
+    setPlanItems(null);
+    try {
+      let targetFile: File = files[0];
+
+      if (files.length > 1) {
+        setMerging(true);
+        const mergeForm = new FormData();
+        for (const f of files) mergeForm.append("files", f);
+        mergeForm.append("target", "csv");
+        const mergeRes = await fetch(API_ENDPOINTS.MERGE_FILES, {
+          method: "POST",
+          headers: authHeaders(),
+          body: mergeForm,
+        });
+        const mergeData = await mergeRes.json();
+        if (!mergeRes.ok)
+          throw new Error(
+            mergeData.error || mergeData.detail || t("an.analysisError"),
+          );
+        const blobRes = await fetch(mergeData.download_url);
+        const blob = await blobRes.blob();
+        targetFile = new File([blob], mergeData.download_name || "merged.csv", {
+          type: "text/csv",
+        });
+        setMerging(false);
+      }
+
+      const [planRes, dataRes] = await Promise.all([
+        fetch(API_ENDPOINTS.ANALYZE, {
+          method: "POST",
+          headers: authHeaders(),
+          body: (() => {
+            const fd = new FormData();
+            fd.append("file", targetFile);
+            return fd;
+          })(),
+        }),
+        fetch(API_ENDPOINTS.ANALYZE_DATA, {
+          method: "POST",
+          headers: authHeaders(),
+          body: (() => {
+            const fd = new FormData();
+            fd.append("file", targetFile);
+            return fd;
+          })(),
+        }),
+      ]);
+      const planData = await planRes.json();
+      const readData = await dataRes.json();
+      if (!planRes.ok)
+        throw new Error(
+          planData.error || planData.detail || t("an.analysisError"),
+        );
+      if (!dataRes.ok)
+        throw new Error(
+          readData.error || readData.detail || t("an.analysisError"),
+        );
+      const items: PlanItem[] = (planData.plan || []).map(
+        (p: PlanItem): PlanItem => ({
+          ...p,
+          run: p.side === "clean",
+        }),
+      );
+      setPlanItems(items);
+      setReadResult(readData as AnalysisResult);
+      setPlanLoaded(true);
+      setActiveStep(1);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("an.connFailed"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const postClean = (
+    target: File,
+    planJson: string,
+  ): Promise<CleaningResultT> =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const form = new FormData();
+      form.append("file", target);
+      form.append("plan", planJson);
+      xhr.open("POST", API_ENDPOINTS.UPLOAD);
+      xhr.setRequestHeader(
+        "Authorization",
+        `Bearer ${localStorage.getItem("token") || ""}`,
+      );
+      xhr.responseType = "json";
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300 && xhr.response) {
+          resolve(xhr.response);
+        } else {
+          reject(
+            new Error(
+              xhr.response?.error ||
+                xhr.response?.detail ||
+                t("an.analysisError"),
+            ),
+          );
+        }
+      };
+      xhr.onerror = () => reject(new Error(t("an.connFailed")));
+      xhr.send(form);
+    });
+
+  const fetchCleanedFile = async (
+    cleanResult: CleaningResultT,
+  ): Promise<File> => {
+    const url = cleanResult.download_url || "";
+    if (url.startsWith("data:")) {
+      const blob = await (await fetch(url)).blob();
+      return new File([blob], cleanResult.cleaned_file_name || "cleaned.csv", {
+        type: "text/csv",
+      });
+    }
+    const m = url.match(/\/download\/([0-9a-fA-F]{8,})/);
+    if (!m) throw new Error(t("an.analysisError"));
+    const res = await fetch(`/api/download?id=${m[1]}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) throw new Error(t("an.downloadFailed"));
+    const blob = await res.blob();
+    return new File([blob], cleanResult.cleaned_file_name || "cleaned.csv", {
+      type: "text/csv",
+    });
+  };
+
+  const reAnalyzeCleaned = async (cleanedFile: File) => {
+    try {
+      const fd = new FormData();
+      fd.append("file", cleanedFile);
+      const res = await fetch(API_ENDPOINTS.ANALYZE_DATA, {
+        method: "POST",
+        headers: authHeaders(),
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok)
+        throw new Error(data.error || data.detail || t("an.analysisError"));
+      setReadResult(data as AnalysisResult);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("an.analysisError"));
+    }
+  };
+
+  const applyCleaning = async () => {
+    if (files.length === 0 || !planItems) return;
+    setCleaning(true);
+    setError("");
+    try {
+      const approved = planItems
+        .filter((p) => p.run !== false)
+        .map((p) => ({ ...p, run: true }));
+      const planJson = JSON.stringify(approved);
+      const cleanResult = await postClean(files[0], planJson);
+      const cleanedFile = await fetchCleanedFile(cleanResult);
+      setCleanedReady(true);
+      await reAnalyzeCleaned(cleanedFile);
+      setActiveStep(5);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("an.analysisError"));
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const togglePlanItem = (id: string) => {
+    setPlanItems((prev) =>
+      prev ? prev.map((p) => (p.id === id ? { ...p, run: !p.run } : p)) : prev,
+    );
+  };
+
+  // Question answers fine-tune the plan.
+  const refinePlan = (predicate: (p: PlanItem) => boolean, run: boolean) => {
+    setPlanItems((prev) =>
+      prev ? prev.map((p) => (predicate(p) ? { ...p, run } : p)) : prev,
+    );
+  };
+
+  const resetAll = () => {
+    setFiles([]);
+    setGoal("");
+    setError("");
+    setActiveStep(0);
+    setPlanItems(null);
+    setPlanLoaded(false);
+    setReadResult(null);
+    setCleanedReady(false);
+    setSelectedCharts(new Set());
+  };
+
+  const mapToUploadResult = useCallback(
+    (r: AnalysisResult): UploadResultLike => {
+      const colTypes: Record<string, string> = {};
+      if (r.column_types) {
+        for (const [dtype, info] of Object.entries(r.column_types)) {
+          for (const col of info.columns) colTypes[col] = dtype;
+        }
+      }
+      return {
+        rows_before: r.rows,
+        rows_after: r.rows,
+        duplicates_removed: r.total_duplicates,
+        missing_values_filled: r.total_nulls,
+        outliers_detected:
+          r.columns?.reduce((sum, c) => sum + (c.outliers_count ?? 0), 0) ?? 0,
+        quality_score: r.kpis?.quality_score,
+        execution_time_seconds: undefined,
+        summary: r.kpis
+          ? `Rows: ${r.rows}, Columns: ${r.columns}, Quality: ${r.kpis.quality_score}/100`
+          : undefined,
+        ai_explanation: r.ai_explanation,
+        cleaning_log: undefined,
+        recommendations: r.recommendations,
+        alerts: undefined,
+        column_data_types:
+          Object.keys(colTypes).length > 0 ? colTypes : undefined,
+        sample: r.sample,
+      };
+    },
+    [],
+  );
+
+  const handleExport = async (
+    kind: "excel" | "sql" | "ppt" | "json" | "pdf",
+  ) => {
+    if (!readResult) return;
+    const name =
+      readResult.dataset?.file_name?.replace(/\.[^.]+$/, "") || "analysis";
+    const design: ReportDesign = { theme: reportTheme, color: reportColor };
+    try {
+      switch (kind) {
+        case "excel":
+          await downloadExcelResult(
+            mapToUploadResult(readResult),
+            name,
+            reportColor,
+          );
+          break;
+        case "sql":
+          downloadSqlResult(mapToUploadResult(readResult), name);
+          break;
+        case "ppt":
+          await downloadPowerpointResult(
+            mapToUploadResult(readResult),
+            name,
+            reportColor,
+          );
+          break;
+        case "json": {
+          const blob = new Blob([JSON.stringify(readResult, null, 2)], {
+            type: "application/json",
+          });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `${name}.json`;
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          break;
+        }
+        case "pdf":
+          downloadPdfFromUploadResult(
+            mapToUploadResult(readResult),
+            name,
+            design,
+          );
+          break;
+      }
+    } catch {
+      setError(t("an.analysisError"));
+    }
+  };
+
+  // ----- Scheduled reports (advanced) -----
+  const readResultRef = useRef(readResult);
+  readResultRef.current = readResult;
+
+  const runScheduledExport = useCallback(
+    async (s: ScheduledReport) => {
+      const result = readResultRef.current;
+      if (!result) return;
+      const name =
+        result.dataset?.file_name?.replace(/\.[^.]+$/, "") || "analysis";
+      const design: ReportDesign = { theme: reportTheme, color: reportColor };
+      switch (s.format) {
+        case "excel":
+          await downloadExcelResult(
+            mapToUploadResult(result),
+            name,
+            reportColor,
+          );
+          break;
+        case "ppt":
+          await downloadPowerpointResult(
+            mapToUploadResult(result),
+            name,
+            reportColor,
+          );
+          break;
+        case "pdf":
+          downloadPdfFromUploadResult(mapToUploadResult(result), name, design);
+          break;
+      }
+      if (s.email)
+        window.location.href = `mailto:${s.email}?subject=${encodeURIComponent(name)}&body=${encodeURIComponent(t("sched.mailBody"))}`;
+      if (s.telegram && s.telegram.trim().length > 0) {
+        try {
+          if (
+            typeof Notification !== "undefined" &&
+            Notification.permission === "granted"
+          ) {
+            new Notification(t("sched.title"), {
+              body: t("sched.telegramBody"),
+            });
+          }
+        } catch {
+          // notifications not available
+        }
+      }
+    },
+    [mapToUploadResult, reportTheme, reportColor, t],
+  );
+
+  useEffect(() => {
+    setScheduled(readScheduled());
+    const tick = () => {
+      const now = Date.now();
+      const due = readScheduled().filter(
+        (s) => s.workspaceId === workId && s.nextRunAt <= now,
+      );
+      if (due.length > 0) {
+        due.forEach((s) => runScheduledExport(s));
+        due.forEach((s) => postponeSchedule(s.id));
+        setScheduled(readScheduled());
+      }
+    };
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, [workId, runScheduledExport]);
+
+  useEffect(() => {
+    if (activeWork?.delivery) {
+      setSchedEmail((prev) => prev || activeWork.delivery?.email || "");
+      setSchedTelegram((prev) => prev || activeWork.delivery?.telegram || "");
+    }
+  }, [activeWork?.id]);
+
+  const saveSchedule = (e: React.FormEvent) => {
+    e.preventDefault();
+    addSchedule({
+      workspaceId: workId,
+      name:
+        readResult?.dataset?.file_name?.replace(/\.[^.]+$/, "") ||
+        t("sched.defaultName"),
+      frequency: schedFreq,
+      format: schedFormat,
+      email: schedEmail.trim() || undefined,
+      telegram: schedTelegram.trim() || undefined,
+    });
+    setScheduled(readScheduled());
+    setSchedSaved(true);
+    window.setTimeout(() => setSchedSaved(false), 4000);
+  };
+
+  const cancelSchedule = (id: string) => {
+    removeSchedule(id);
+    setScheduled(readScheduled());
+  };
+
+  const numericCols = useMemo(
+    () =>
+      readResult?.columns?.filter((c) => c.histogram && c.histogram.length) ||
+      [],
+    [readResult],
+  );
+  const categoricalCols = useMemo(
+    () =>
+      readResult?.columns?.filter((c) => c.top_values && c.top_values.length) ||
+      [],
+    [readResult],
+  );
+  const sampleHeaders = useMemo(() => {
+    if (!readResult?.sample || readResult.sample.length === 0) return [];
+    return Object.keys(readResult.sample[0]);
+  }, [readResult]);
+
+  const strongestCorrelation = useMemo(() => {
+    const corr = readResult?.correlation || [];
+    let best: { row: string; col: string; value: number } | null = null;
+    for (const r of corr) {
+      if (r.row === r.col) continue;
+      const mag = Math.abs(r.value);
+      if (!best || mag > Math.abs(best.value)) best = r;
+    }
+    return best && best.value ? best : null;
+  }, [readResult]);
+
+  const totalCharts =
+    readResult?.charts?.histograms?.length ||
+    readResult?.charts?.boxplots?.length ||
+    0;
+
+  const toggleChart = (id: string) => {
+    setSelectedCharts((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const stepClass = (idx: number) => {
+    if (idx < activeStep)
+      return "bg-emerald-500/10 border-emerald-500/40 text-emerald-300";
+    if (idx === activeStep)
+      return "bg-[#4f7cff]/15 border-[#4f7cff]/50 text-[#4f7cff]";
+    return "bg-white/[0.03] border-white/10 text-white/40";
+  };
+
+  const reportName =
+    readResult?.dataset?.file_name?.replace(/\.[^.]+$/, "") || "analysis";
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#8b5cf6] flex items-center justify-center shadow-lg shadow-blue-500/25">
+            <Wand2 className="w-6 h-6 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold tracking-tight">
+              {t("pipe.title")}
+            </h1>
+            <p className="text-sm text-white/60">{t("pipe.subtitle")}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setCompanionMode((prev) => !prev)}
+            className={`ml-auto flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 border transition ${
+              companionMode
+                ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white"
+            }`}
+          >
+            <GraduationCap className="w-3.5 h-3.5" />
+            {companionMode ? t("pipe.companionOn") : t("pipe.companionOff")}
+          </button>
+          {planLoaded && (
+            <button
+              type="button"
+              onClick={resetAll}
+              className="text-xs text-white/50 hover:text-[#4f7cff] transition flex items-center gap-1"
+            >
+              <RefreshCcw className="w-3.5 h-3.5" /> {t("pipe.again")}
+            </button>
+          )}
+        </div>
+
+        {/* Companion hints */}
+        {companionMode && (
+          <div className="mt-2 mb-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-4 text-sm text-emerald-100/90">
+            <p className="flex items-center gap-2 font-medium mb-1">
+              <GraduationCap className="w-4 h-4 text-emerald-300" />
+              {t("pipe.companionTitle")}
+            </p>
+            <p
+              className="text-emerald-100/70 leading-relaxed text-[13px]"
+              dir="auto"
+            >
+              {t(`pipe.companion.step${activeStep}` as const)}
+            </p>
+          </div>
+        )}
+
+        {/* Stepper */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          {STEPS.map((step, idx) => {
+            const Icon = step.icon;
+            const done = idx < activeStep;
+            const active = idx === activeStep;
+            return (
+              <div
+                key={step.key}
+                className={`flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs rounded-full px-2 sm:px-3 py-1.5 border transition cursor-pointer ${
+                  active || done ? "" : "opacity-70"
+                } ${stepClass(idx)}`}
+                onClick={() => {
+                  if (idx === 0 || planLoaded) setActiveStep(idx);
+                }}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span className="whitespace-nowrap">{t(step.key)}</span>
+                {done && (
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {error && (
+          <div className="mt-4 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-xl px-3 py-2.5">
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* ===== STEP 0: Goal + file ===== */}
+      {activeStep === 0 && (
+        <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-6 space-y-5">
+          <div>
+            <label className="block text-sm text-white/70 mb-1.5">
+              {t("pipe.uploadTitle")}
+            </label>
+            <p className="text-xs text-white/40 mb-2">
+              {t("pipe.uploadSubtitle")}
+            </p>
+            <textarea
+              value={goal}
+              onChange={(e) => setGoal(e.target.value)}
+              placeholder={t("pipe.uploadPlaceholder")}
+              className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#4f7cff]/50 resize-none"
+              rows={2}
+            />
+            <div className="flex flex-wrap gap-2 mt-2">
+              {GOAL_CHIPS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setGoal(t(key))}
+                  className="text-xs bg-white/5 border border-white/10 rounded-full px-3 py-1.5 text-white/60 hover:border-[#4f7cff]/40 hover:text-[#4f7cff] transition"
+                >
+                  {t(key)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Analysis mode toggle */}
+          <div>
+            <label className="block text-sm text-white/70 mb-1.5">
+              {t("pipe.modeLabel")}
+            </label>
+            <p className="text-xs text-white/40 mb-2">
+              {t("pipe.modeSubtitle")}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setAnalysisMode("auto")}
+                className={`border rounded-2xl p-4 text-left transition ${
+                  analysisMode === "auto"
+                    ? "border-[#4f7cff]/60 bg-[#4f7cff]/10 ring-1 ring-[#4f7cff]/30"
+                    : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Sparkles className="w-4 h-4 text-[#4f7cff]" />
+                  <span className="text-sm font-semibold">
+                    {t("pipe.modeAuto")}
+                  </span>
+                </div>
+                <p className="text-xs text-white/50">
+                  {t("pipe.modeAutoDesc")}
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAnalysisMode("manual")}
+                className={`border rounded-2xl p-4 text-left transition ${
+                  analysisMode === "manual"
+                    ? "border-[#8b5cf6]/60 bg-[#8b5cf6]/10 ring-1 ring-[#8b5cf6]/30"
+                    : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Wand2 className="w-4 h-4 text-[#8b5cf6]" />
+                  <span className="text-sm font-semibold">
+                    {t("pipe.modeManual")}
+                  </span>
+                </div>
+                <p className="text-xs text-white/50">
+                  {t("pipe.modeManualDesc")}
+                </p>
+              </button>
+            </div>
+          </div>
+
+          {/* Manual configuration panel */}
+          {analysisMode === "manual" && (
+            <div className="border border-[#8b5cf6]/30 bg-[#8b5cf6]/[0.03] rounded-2xl p-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <Wand2 className="w-4 h-4 text-[#8b5cf6]" />
+                <span className="text-sm font-semibold text-[#a78bfa]">
+                  {t("pipe.manualConfigTitle")}
+                </span>
+              </div>
+
+              {/* Analysis modules */}
+              <div>
+                <p className="text-xs text-white/60 mb-2">
+                  {t("pipe.manualModulesLabel")}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {ANALYSIS_MODULES.map((m) => {
+                    const Icon = m.icon;
+                    const active = selectedModules.has(m.id);
+                    return (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => toggleModule(m.id)}
+                        className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 border transition ${
+                          active
+                            ? "bg-[#8b5cf6]/20 border-[#8b5cf6]/50 text-[#a78bfa]"
+                            : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white"
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        {t(m.labelKey)}
+                        {active && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Chart types with reasons */}
+              <div>
+                <p className="text-xs text-white/60 mb-2">
+                  {t("pipe.manualChartsLabel")}
+                </p>
+                <div className="space-y-2">
+                  {CHART_TYPES.map((c) => {
+                    const id = c.id;
+                    const active = enabledCharts.has(id);
+                    const name = chartNames[id] || "";
+                    return (
+                      <div
+                        key={id}
+                        className={`rounded-xl border px-3 py-2.5 transition ${
+                          active
+                            ? "border-[#8b5cf6]/40 bg-[#8b5cf6]/5"
+                            : "border-white/10 bg-white/[0.02] opacity-60"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => toggleChartType(id)}
+                            className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition ${
+                              active
+                                ? "bg-[#8b5cf6] border-[#8b5cf6] text-white"
+                                : "bg-transparent border-white/30"
+                            }`}
+                          >
+                            {active && <CheckCircle2 className="w-3 h-3" />}
+                          </button>
+                          <span className="text-xs font-medium text-white/80">
+                            {t(c.labelKey)}
+                          </span>
+                        </div>
+                        <p
+                          className="text-[11px] text-white/40 mt-1 pl-6 flex items-start gap-1"
+                          dir="auto"
+                        >
+                          <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                          {t(c.whyKey)}
+                        </p>
+                        <input
+                          value={name}
+                          onChange={(e) =>
+                            setChartNames((prev) => ({
+                              ...prev,
+                              [id]: e.target.value,
+                            }))
+                          }
+                          placeholder={t("pipe.chartNamePlaceholder", {
+                            name: t(c.labelKey),
+                          })}
+                          className="mt-2 ml-6 w-[calc(100%-1.5rem)] bg-white/[0.04] border border-white/10 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-white/25 focus:outline-none focus:border-[#8b5cf6]/50"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm text-white/70 mb-1.5">
+              {t("pipe.fileLabel")}
+            </label>
+            <p className="text-xs text-white/40 mb-2">{t("pipe.fileHint")}</p>
+            <input
+              ref={inputRef}
+              type="file"
+              accept=".csv,.xlsx,.xls,.pdf"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                addFiles(e.target.files);
+                if (e.target.files && e.target.files.length > 0)
+                  setActiveStep(0);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="w-full border-2 border-dashed border-white/15 hover:border-[#4f7cff]/50 rounded-2xl p-8 flex flex-col items-center gap-2 text-center transition group"
+            >
+              <UploadCloud className="w-8 h-8 text-[#4f7cff]" />
+              {files.length > 0 ? (
+                <span className="text-sm text-white/70">
+                  {t("pipe.addMore")}
+                </span>
+              ) : (
+                <>
+                  <span className="text-sm text-white/70">
+                    {t("pipe.browse")}
+                  </span>
+                  <span className="text-xs text-white/40">
+                    {t("pipe.fileHintMulti")}
+                  </span>
+                </>
+              )}
+            </button>
+
+            {files.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {files.map((f) => {
+                  const Icon = getFileIcon(f.name);
+                  return (
+                    <div
+                      key={f.name}
+                      className="flex items-center gap-3 bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2.5"
+                    >
+                      <Icon className="w-4 h-4 text-[#4f7cff] shrink-0" />
+                      <span className="text-sm text-white/80 truncate flex-1">
+                        {f.name}
+                      </span>
+                      <span className="text-xs text-white/40 shrink-0">
+                        {(f.size / 1024).toFixed(1)} KB
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeFile(f.name)}
+                        className="shrink-0 text-white/30 hover:text-red-400 transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
+                {files.length > 1 && (
+                  <div className="flex items-center gap-2 text-xs text-[#4f7cff]/70 bg-[#4f7cff]/5 border border-[#4f7cff]/20 rounded-xl px-3 py-2">
+                    <Layers className="w-3.5 h-3.5 shrink-0" />
+                    <span>{t("pipe.multiFileMerge", { n: files.length })}</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => activeStep > 0 && setActiveStep(activeStep - 1)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              disabled={!canSubmit}
+              onClick={runRead}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 shadow-lg shadow-blue-500/20"
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Sparkles className="w-4 h-4" />
+              )}
+              {merging
+                ? t("pipe.merging")
+                : loading
+                  ? t("pipe.starting")
+                  : t("pipe.start")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 1: Agent's first reading ===== */}
+      {activeStep === 1 && readResult && (
+        <div className="space-y-6">
+          <div className="rounded-3xl overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#4f7cff]/15 via-transparent to-[#a78bfa]/15" />
+            <div className="absolute inset-0 border border-white/10 rounded-3xl" />
+            <div className="relative p-5">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-[#4f7cff] to-[#a78bfa] flex items-center justify-center shadow-lg shadow-purple-500/20 shrink-0">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h2 className="font-semibold">
+                      {t("pipe.understandTitle")}
+                    </h2>
+                    <span className="text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full px-2 py-0.5">
+                      {t("pipe.readingDone")}
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/80 leading-relaxed">
+                    {readResult.ai_explanation || t("pipe.readingDone")}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Summary cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              {
+                label: t("pipe.datasetRows"),
+                value: readResult.rows,
+                icon: Table2,
+              },
+              {
+                label: t("pipe.datasetColumns"),
+                value: readResult.column_count,
+                icon: Layers,
+              },
+              {
+                label: t("pipe.missingValues"),
+                value: readResult.total_nulls,
+                icon: AlertTriangle,
+              },
+              {
+                label: t("pipe.duplicateRows"),
+                value: readResult.total_duplicates,
+                icon: GitCompareArrows,
+              },
+            ].map(({ label, value, icon: Icon }) => (
+              <div
+                key={label}
+                className="border border-white/10 rounded-2xl bg-white/[0.02] p-4 flex items-center gap-3"
+              >
+                <div className="w-10 h-10 rounded-xl bg-[#4f7cff]/10 flex items-center justify-center">
+                  <Icon className="w-5 h-5 text-[#4f7cff]" />
+                </div>
+                <div>
+                  <div className="text-2xl font-bold">{value}</div>
+                  <div className="text-xs text-white/50">{label}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveStep(0)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep(2)}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition shadow-lg shadow-blue-500/20"
+            >
+              {t("pipe.next")}
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 2: Clarifying questions ===== */}
+      {activeStep === 2 && planItems && (
+        <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-6 space-y-5">
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <Lightbulb className="w-5 h-5 text-[#4f7cff]" />{" "}
+              {t("pipe.askTitle")}
+            </h2>
+            <p className="text-xs text-white/40 mt-1">
+              {t("pipe.askSubtitle")}
+            </p>
+          </div>
+
+          <p className="text-xs text-white/50">{t("pipe.questionPropose")}</p>
+
+          <div className="space-y-3">
+            <QuestionRow
+              label={t("question.removeDupes")}
+              value={
+                planItems.some(
+                  (p) => p.id === "duplicates" || p.title.includes("مكرر"),
+                )
+                  ? "yes"
+                  : "no"
+              }
+              onChange={(v) =>
+                refinePlan(
+                  (p) =>
+                    p.id === "duplicates" || (p.title || "").includes("مكرر"),
+                  v === "yes",
+                )
+              }
+            />
+            <QuestionRow
+              label={t("question.fillNulls")}
+              value={
+                planItems.some(
+                  (p) => p.id === "nulls" || (p.title || "").includes("ناقص"),
+                )
+                  ? "yes"
+                  : "no"
+              }
+              onChange={(v) =>
+                refinePlan(
+                  (p) => p.id === "nulls" || (p.title || "").includes("ناقص"),
+                  v === "yes",
+                )
+              }
+            />
+            <QuestionRow
+              label={t("question.removeOutliers")}
+              value={
+                planItems.some(
+                  (p) => p.id === "outliers" || (p.title || "").includes("شاذ"),
+                )
+                  ? "yes"
+                  : "no"
+              }
+              onChange={(v) =>
+                refinePlan(
+                  (p) => p.id === "outliers" || (p.title || "").includes("شاذ"),
+                  v === "yes",
+                )
+              }
+            />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveStep(1)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep(3)}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition shadow-lg shadow-blue-500/20"
+            >
+              {t("pipe.applyQuestion")}
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 3: Problems & plan ===== */}
+      {activeStep === 3 && planItems && (
+        <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-6 space-y-5">
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-[#4f7cff]" />{" "}
+              {t("pipe.planTitle")}
+            </h2>
+            <p className="text-xs text-white/40 mt-1">
+              {t("pipe.planSubtitle")}
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {planItems.map((item) => (
+              <div
+                key={item.id}
+                className={`border rounded-2xl p-4 transition ${
+                  item.run !== false
+                    ? "border-[#4f7cff]/40 bg-[#4f7cff]/5"
+                    : "border-white/10 bg-white/[0.02] opacity-70"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <button
+                    type="button"
+                    onClick={() => togglePlanItem(item.id)}
+                    className={`w-5 h-5 rounded border mt-0.5 shrink-0 flex items-center justify-center transition ${
+                      item.run !== false
+                        ? "bg-[#4f7cff] border-[#4f7cff] text-white"
+                        : "bg-transparent border-white/30 text-transparent"
+                    }`}
+                  >
+                    {item.run !== false && (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium text-sm">{item.title}</p>
+                      <span
+                        className={`text-[10px] rounded-full px-2 py-0.5 border ${
+                          item.side === "keep"
+                            ? "bg-sky-500/10 text-sky-300 border-sky-500/30"
+                            : "bg-[#4f7cff]/10 text-[#4f7cff] border-[#4f7cff]/30"
+                        }`}
+                      >
+                        {item.side === "keep"
+                          ? t("pipe.askKeep")
+                          : t("pipe.askYes")}
+                      </span>
+                    </div>
+                    {item.summary && (
+                      <p className="text-xs text-white/50 mt-1">
+                        {item.summary}
+                      </p>
+                    )}
+                    {item.reason && (
+                      <p className="text-xs text-white/40 mt-1 flex items-start gap-1">
+                        <Info className="w-3 h-3 mt-0.5 shrink-0" />
+                        {item.reason}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveStep(2)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              disabled={cleaning}
+              onClick={applyCleaning}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition disabled:opacity-40 shadow-lg shadow-blue-500/20"
+            >
+              {cleaning ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <ShieldCheck className="w-4 h-4" />
+              )}
+              {cleaning ? t("pipe.cleanRunning") : t("pipe.planApply")}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 4: Cleaning in progress / done ===== */}
+      {activeStep === 4 && (
+        <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-8 text-center">
+          <Loader2 className="w-8 h-8 text-[#4f7cff] animate-spin mx-auto mb-3" />
+          <p className="text-sm text-white/60">{t("pipe.cleanRunning")}</p>
+        </div>
+      )}
+
+      {/* ===== STEP 5: Analysis ===== */}
+      {activeStep >= 5 && readResult && (
+        <div className="space-y-6">
+          {/* Success banner */}
+          {cleanedReady && (
+            <div className="flex items-center gap-3 text-emerald-300 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl px-4 py-3 text-sm">
+              <CheckCircle2 className="w-5 h-5 shrink-0" />
+              {t("pipe.cleanDone")}
+            </div>
+          )}
+
+          {/* Manual mode banner */}
+          {analysisMode === "manual" && (
+            <div className="flex items-start gap-3 text-[#a78bfa] bg-[#8b5cf6]/10 border border-[#8b5cf6]/30 rounded-2xl px-4 py-3 text-sm">
+              <Wand2 className="w-5 h-5 mt-0.5 shrink-0" />
+              <div>
+                <p className="font-medium">{t("pipe.manualModeApplied")}</p>
+                <p className="text-xs text-white/50 mt-1">
+                  {t("pipe.manualModulesCount", { n: selectedModules.size })} ·{" "}
+                  {t("pipe.manualChartsCount", { n: enabledCharts.size })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Analysis tabs */}
+          <div className="flex flex-wrap gap-2">
+            {[
+              { id: "kpis" as const, label: t("an.kpis"), icon: Activity },
+              { id: "group" as const, label: t("an.groupBy"), icon: Layers },
+              {
+                id: "highest" as const,
+                label: t("an.topValues"),
+                icon: Trophy,
+              },
+              {
+                id: "correlation" as const,
+                label: t("an.tabCorrelation"),
+                icon: GitCompareArrows,
+              },
+              {
+                id: "insights" as const,
+                label: t("an.insights"),
+                icon: Lightbulb,
+              },
+            ]
+              .filter(
+                (tab) =>
+                  analysisMode !== "manual" || selectedModules.has(tab.id),
+              )
+              .map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setAnalysisTab(tab.id)}
+                    className={`flex items-center gap-2 text-xs rounded-full px-3 py-1.5 border transition ${
+                      analysisTab === tab.id
+                        ? "bg-[#4f7cff]/15 border-[#4f7cff]/50 text-[#4f7cff]"
+                        : "bg-white/[0.03] border-white/10 text-white/50 hover:text-white"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {tab.label}
+                  </button>
+                );
+              })}
+          </div>
+
+          {/* KPIs */}
+          {(analysisMode !== "manual" || selectedModules.has("kpis")) &&
+            analysisTab === "kpis" &&
+            readResult.kpis && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                  <KpiTile
+                    label={t("an.completeness")}
+                    value={`${readResult.kpis.completeness_score}%`}
+                    accent="text-emerald-400"
+                  />
+                  <KpiTile
+                    label={t("an.quality")}
+                    value={`${readResult.kpis.quality_score}`}
+                    accent="text-[#4f7cff]"
+                  />
+                  <KpiTile
+                    label={t("an.missingValues")}
+                    value={`${readResult.kpis.missing_values} (${readResult.kpis.missing_pct}%)`}
+                    accent="text-red-400"
+                  />
+                  <KpiTile
+                    label={t("an.duplicateRows")}
+                    value={`${readResult.kpis.duplicate_rows} (${readResult.kpis.duplicate_pct}%)`}
+                    accent="text-amber-400"
+                  />
+                  <KpiTile
+                    label={t("an.columns")}
+                    value={`${readResult.kpis.numeric_columns} ${t("an.numeric")} · ${readResult.kpis.categorical_columns} ${t("an.categorical")}`}
+                    accent="text-sky-400"
+                  />
+                </div>
+                <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-5">
+                  <div className="flex flex-col md:flex-row items-center gap-6">
+                    <div className="relative w-28 h-28 shrink-0">
+                      <svg
+                        viewBox="0 0 100 100"
+                        className="w-full h-full -rotate-90"
+                      >
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="42"
+                          fill="none"
+                          stroke="rgba(255,255,255,0.08)"
+                          strokeWidth="10"
+                        />
+                        <circle
+                          cx="50"
+                          cy="50"
+                          r="42"
+                          fill="none"
+                          stroke={
+                            readResult.kpis.quality_score >= 80
+                              ? "#34d399"
+                              : readResult.kpis.quality_score >= 50
+                                ? "#4f7cff"
+                                : "#ef4444"
+                          }
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={`${(readResult.kpis.quality_score / 100) * 264} 264`}
+                          className="transition-all duration-700"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <span className="text-2xl font-bold">
+                          {readResult.kpis.quality_score}
+                        </span>
+                        <span className="text-[10px] text-white/50">
+                          {t("an.of100")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                        {t("an.qualityScore")}
+                      </h3>
+                      <p className="text-sm text-white/60 leading-relaxed">
+                        {readResult.kpis.quality_score >= 80
+                          ? t("an.qualityExcellent")
+                          : readResult.kpis.quality_score >= 60
+                            ? t("an.qualityGood")
+                            : readResult.kpis.quality_score >= 40
+                              ? t("an.qualityMedium")
+                              : t("an.qualityPoor")}
+                      </p>
+                      <p className="text-sm text-white/40 leading-relaxed">
+                        {readResult.ai_explanation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          {/* Group by */}
+          {(analysisMode !== "manual" || selectedModules.has("group")) &&
+            analysisTab === "group" && (
+              <div className="space-y-4">
+                {readResult.group_by && readResult.group_by.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {readResult.group_by.map((g) => (
+                      <ChartCard key={g.column} title={g.column}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={g.groups.map((gr) => ({
+                              value: String(gr.value),
+                              pct: gr.pct ?? 0,
+                            }))}
+                            layout="vertical"
+                            margin={{ left: 8 }}
+                          >
+                            <XAxis
+                              type="number"
+                              stroke="rgba(255,255,255,0.3)"
+                              fontSize={10}
+                            />
+                            <YAxis
+                              type="category"
+                              dataKey="value"
+                              width={110}
+                              stroke="rgba(255,255,255,0.3)"
+                              fontSize={10}
+                            />
+                            <Tooltip contentStyle={tooltipStyle} />
+                            <Bar
+                              dataKey="pct"
+                              fill="#4f7cff"
+                              radius={[0, 6, 6, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </ChartCard>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState label={t("an.noGroupBy")} />
+                )}
+              </div>
+            )}
+
+          {/* Highest */}
+          {(analysisMode !== "manual" || selectedModules.has("highest")) &&
+            analysisTab === "highest" && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {readResult.highest && readResult.highest.length > 0 ? (
+                  readResult.highest.map((col) => (
+                    <div
+                      key={col.column}
+                      className="border border-white/10 rounded-2xl bg-white/[0.02] p-4"
+                    >
+                      <p className="text-sm font-medium mb-2 truncate">
+                        {col.column}
+                      </p>
+                      {col.kind === "numeric" && (
+                        <div className="flex gap-4 text-xs text-white/60 mb-2">
+                          <span>
+                            {t("an.maxColumn")}:{" "}
+                            <b className="text-white">{col.max}</b>
+                          </span>
+                          <span>
+                            {t("an.minColumn")}:{" "}
+                            <b className="text-white">{col.min}</b>
+                          </span>
+                        </div>
+                      )}
+                      <div className="space-y-1.5">
+                        {col.top.map((item, i) => (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between text-sm"
+                          >
+                            <span className="truncate text-white/70">
+                              {item.value}
+                            </span>
+                            <span className="text-white/50 text-xs">
+                              ×{item.count}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <EmptyState label={t("an.noTopValues")} />
+                )}
+              </div>
+            )}
+
+          {/* Correlation */}
+          {(analysisMode !== "manual" || selectedModules.has("correlation")) &&
+            analysisTab === "correlation" && (
+              <div className="space-y-4">
+                {strongestCorrelation && (
+                  <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-4 text-sm text-white/70">
+                    <p className="flex items-center gap-2">
+                      <GitCompareArrows className="w-4 h-4 text-[#4f7cff]" />
+                      <span>
+                        {t("an.relationshipBetween")}{" "}
+                        <b className="text-white">{strongestCorrelation.row}</b>{" "}
+                        {t("an.relationshipAnd")}{" "}
+                        <b className="text-white">{strongestCorrelation.col}</b>
+                      </span>
+                    </p>
+                    <p className="text-xs text-white/40 mt-2" dir="auto">
+                      {strongestCorrelation.value >= 0
+                        ? t("agent.whyCorrelation")
+                        : t("an.corrNegativeHint")}
+                    </p>
+                  </div>
+                )}
+                {readResult.scatter && readResult.scatter.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {readResult.scatter.map((s) => (
+                      <div
+                        key={`${s.x_col}${s.y_col}`}
+                        className="border border-white/10 rounded-3xl bg-white/[0.02] p-5"
+                      >
+                        <p className="text-sm text-white/60 mb-3">
+                          {t("an.relationshipBetween")}{" "}
+                          <b className="text-white">{s.x_col}</b>{" "}
+                          {t("an.relationshipAnd")}{" "}
+                          <b className="text-white">{s.y_col}</b>
+                        </p>
+                        <div className="h-60">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <ScatterChart
+                              margin={{
+                                top: 10,
+                                right: 10,
+                                bottom: 10,
+                                left: 10,
+                              }}
+                            >
+                              <CartesianGrid stroke="rgba(255,255,255,0.05)" />
+                              <XAxis
+                                dataKey="x"
+                                name={s.x_col}
+                                stroke="rgba(255,255,255,0.3)"
+                                fontSize={10}
+                              />
+                              <YAxis
+                                dataKey="y"
+                                name={s.y_col}
+                                stroke="rgba(255,255,255,0.3)"
+                                fontSize={10}
+                              />
+                              <ZAxis range={[40, 50]} />
+                              <Tooltip contentStyle={tooltipStyle} />
+                              <Scatter data={s.points} fill="#4f7cff" />
+                            </ScatterChart>
+                          </ResponsiveContainer>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState label={t("an.noScatter")} />
+                )}
+              </div>
+            )}
+
+          {/* Insights */}
+          {(analysisMode !== "manual" || selectedModules.has("insights")) &&
+            analysisTab === "insights" && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-5">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3">
+                    <Lightbulb className="w-5 h-5 text-[#4f7cff]" />{" "}
+                    {t("an.insights")}
+                  </h3>
+                  <div className="space-y-2">
+                    {(readResult.insights || []).map((item, i) => (
+                      <p
+                        key={i}
+                        className="text-sm text-white/70 leading-relaxed flex items-start gap-2"
+                        dir="auto"
+                      >
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-5">
+                  <h3 className="font-semibold flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-5 h-5 text-[#4f7cff]" />{" "}
+                    {t("an.recommendations")}
+                  </h3>
+                  <div className="space-y-2">
+                    {(readResult.recommendations || []).map((item, i) => (
+                      <p
+                        key={i}
+                        className="text-sm text-white/70 leading-relaxed flex items-start gap-2"
+                        dir="auto"
+                      >
+                        <Sparkles className="w-4 h-4 text-[#4f7cff] mt-0.5 shrink-0" />
+                        {item}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveStep(3)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep(6)}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition shadow-lg shadow-blue-500/20"
+            >
+              {t("pipe.next")} — {t("pipe.stepCharts")}
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 6: Charts with rationale ===== */}
+      {activeStep === 6 && readResult && (
+        <div className="space-y-6">
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <PieIcon className="w-5 h-5 text-[#4f7cff]" />{" "}
+              {t("pipe.chartsTitle")}
+            </h2>
+            <p className="text-xs text-white/40 mt-1">
+              {t("pipe.chartsSubtitle")}
+            </p>
+            {typeof totalCharts === "number" && (
+              <p className="text-xs text-[#4f7cff]/70 mt-2 flex items-center gap-1">
+                <Link2 className="w-3.5 h-3.5" />
+                {selectedCharts.size} {t("pipe.chartUse")}
+              </p>
+            )}
+          </div>
+
+          {/* Server charts with rationale */}
+          {(analysisMode !== "manual" || enabledCharts.has("histogram")) && (
+            <ChartSection
+              title={chartNames.histogram || t("an.numericDistributions")}
+              why={t("agent.whyHistogram")}
+              icon={<Activity className="w-5 h-5 text-[#4f7cff]" />}
+              charts={readResult.charts?.histograms || []}
+              getKey={(c) => `hist-${c.column}`}
+              selected={selectedCharts}
+              onToggle={toggleChart}
+              t={t}
+            />
+          )}
+          {(analysisMode !== "manual" || enabledCharts.has("boxplot")) &&
+            readResult.charts?.boxplots &&
+            readResult.charts.boxplots.length > 0 && (
+              <ChartSection
+                title={chartNames.boxplot || t("an.boxplots")}
+                why={t("agent.whyOutliers")}
+                icon={<AlertTriangle className="w-5 h-5 text-[#4f7cff]" />}
+                charts={readResult.charts.boxplots}
+                getKey={(c) => `box-${c.column}`}
+                selected={selectedCharts}
+                onToggle={toggleChart}
+                t={t}
+              />
+            )}
+          {(analysisMode !== "manual" || enabledCharts.has("groupby")) &&
+            readResult.charts?.group_by &&
+            readResult.charts.group_by.length > 0 && (
+              <ChartSection
+                title={chartNames.groupby || t("an.groupBy")}
+                why={t("agent.whyGroupBy")}
+                icon={<Layers className="w-5 h-5 text-[#4f7cff]" />}
+                charts={readResult.charts.group_by}
+                getKey={(c) => `group-${c.column}`}
+                selected={selectedCharts}
+                onToggle={toggleChart}
+                t={t}
+              />
+            )}
+          {(analysisMode !== "manual" || enabledCharts.has("scatter")) &&
+            readResult.charts?.scatter &&
+            readResult.charts.scatter.length > 0 && (
+              <ChartSection
+                title={chartNames.scatter || t("an.scatterPlot")}
+                why={t("agent.whyScatter")}
+                icon={<PieIcon className="w-5 h-5 text-[#4f7cff]" />}
+                charts={readResult.charts.scatter.map((c) => ({
+                  column: `${c.x_column} & ${c.y_column}`,
+                  title: c.title,
+                  image: c.image,
+                }))}
+                getKey={(c) => `scatter-${c.column}`}
+                selected={selectedCharts}
+                onToggle={toggleChart}
+                t={t}
+              />
+            )}
+          {(analysisMode !== "manual" || enabledCharts.has("heatmap")) &&
+            readResult.charts?.heatmap && (
+              <ChartSection
+                title={chartNames.heatmap || t("an.tabCorrelation")}
+                why={t("agent.whyCorrelation")}
+                icon={<GitCompareArrows className="w-5 h-5 text-[#4f7cff]" />}
+                charts={[
+                  { ...readResult.charts.heatmap, column: "correlation" },
+                ]}
+                getKey={(c) => `heat-${c.title}`}
+                selected={selectedCharts}
+                onToggle={toggleChart}
+                t={t}
+              />
+            )}
+
+          {/* Client-side charts (fallback/extra) */}
+          {(analysisMode !== "manual" || enabledCharts.has("histogram")) &&
+            numericCols.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="font-semibold flex items-center gap-2 px-1">
+                  <Activity className="w-5 h-5 text-[#4f7cff]" />{" "}
+                  {chartNames.histogram || t("an.histograms")}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {numericCols.slice(0, 4).map((c) => (
+                    <ChartCard key={c.name} title={c.name}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={c.histogram}>
+                          <XAxis
+                            dataKey="bin"
+                            stroke="rgba(255,255,255,0.3)"
+                            fontSize={10}
+                          />
+                          <YAxis stroke="rgba(255,255,255,0.3)" fontSize={10} />
+                          <Tooltip contentStyle={tooltipStyle} />
+                          <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                            {c.histogram?.map((_, i) => (
+                              <Cell
+                                key={i}
+                                fill={BAR_COLORS[i % BAR_COLORS.length]}
+                              />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          {(analysisMode !== "manual" || enabledCharts.has("pie")) &&
+            categoricalCols.length > 0 && (
+              <div className="space-y-4">
+                <h2 className="font-semibold flex items-center gap-2 px-1">
+                  <PieIcon className="w-5 h-5 text-[#4f7cff]" />{" "}
+                  {chartNames.pie || t("an.pieChart")}
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {categoricalCols.slice(0, 4).map((c) => (
+                    <ChartCard key={c.name} title={c.name}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={c.top_values}
+                            dataKey="count"
+                            nameKey="value"
+                            cx="50%"
+                            cy="50%"
+                            outerRadius={75}
+                            label={({ percent }) => `${percent}%`}
+                            labelLine={false}
+                          >
+                            {c.top_values?.map((_, i) => (
+                              <Cell
+                                key={i}
+                                fill={PIE_COLORS[i % PIE_COLORS.length]}
+                              />
+                            ))}
+                          </Pie>
+                          <Tooltip contentStyle={tooltipStyle} />
+                          <Legend wrapperStyle={{ fontSize: 10 }} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartCard>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setActiveStep(5)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveStep(7)}
+              className="flex items-center gap-2 bg-gradient-to-r from-[#4f7cff] to-[#8b5cf6] text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition shadow-lg shadow-blue-500/20"
+            >
+              {t("pipe.next")} — {t("pipe.stepReport")}
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ===== STEP 7: Report / export ===== */}
+      {activeStep === 7 && readResult && (
+        <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-6 space-y-6">
+          <div>
+            <h2 className="font-semibold flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#4f7cff]" />{" "}
+              {t("pipe.reportTitle")}
+            </h2>
+            <p className="text-xs text-white/40 mt-1">
+              {t("pipe.reportSubtitle")}
+            </p>
+          </div>
+
+          {/* Quality summary */}
+          {readResult.kpis && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+              <SummaryStat
+                label={t("an.rows")}
+                value={`${readResult.kpis.rows}`}
+              />
+              <SummaryStat
+                label={t("an.quality")}
+                value={`${readResult.kpis.quality_score}`}
+                accent
+              />
+              <SummaryStat
+                label={t("an.completeness")}
+                value={`${readResult.kpis.completeness_score}%`}
+              />
+              <SummaryStat
+                label={t("an.chartsSelected")}
+                value={`${selectedCharts.size}`}
+              />
+            </div>
+          )}
+
+          {/* Report design customization */}
+          <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-4 space-y-4">
+            <div>
+              <p className="text-sm font-medium text-white/80 flex items-center gap-2">
+                <Palette className="w-4 h-4 text-[#4f7cff]" />
+                {t("report.designTitle")}
+              </p>
+              <p className="text-xs text-white/40 mt-1">
+                {t("report.designSubtitle")}
+              </p>
+            </div>
+
+            {/* Template selection */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {REPORT_DESIGNS.map((d) => {
+                const active = reportTheme === d.id;
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => {
+                      setReportTheme(d.id);
+                      if (!d.colors.includes(reportColor))
+                        setReportColor(d.colors[0]);
+                    }}
+                    className={`text-left rounded-xl border p-3 transition ${
+                      active
+                        ? "border-[#4f7cff]/60 bg-[#4f7cff]/10 ring-1 ring-[#4f7cff]/30"
+                        : "border-white/10 bg-white/[0.02] hover:border-white/25"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <span
+                        className="w-4 h-4 rounded-full border border-white/20 shrink-0"
+                        style={{ background: d.colors[0] }}
+                      />
+                      <span className="text-xs font-semibold">
+                        {t(d.labelKey)}
+                      </span>
+                      {active && (
+                        <CheckCircle2 className="w-4 h-4 text-[#4f7cff] ml-auto" />
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      {d.colors.slice(0, 5).map((c) => (
+                        <span
+                          key={c}
+                          className="w-3 h-3 rounded-full"
+                          style={{ background: c }}
+                        />
+                      ))}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Color picker */}
+            <div>
+              <p className="text-xs text-white/60 mb-2">
+                {t("report.accentColor")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {REPORT_DESIGNS.find((d) => d.id === reportTheme)?.colors.map(
+                  (c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setReportColor(c)}
+                      className={`w-8 h-8 rounded-full transition ${
+                        reportColor === c
+                          ? "ring-2 ring-white ring-offset-2 ring-offset-[#0a1020]"
+                          : "opacity-70 hover:opacity-100"
+                      }`}
+                      style={{ background: c }}
+                      aria-label={c}
+                    />
+                  ),
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Schedule & delivery */}
+          <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-4 space-y-4">
+            <div>
+              <p className="text-sm font-medium text-white/80 flex items-center gap-2">
+                <CalendarClock className="w-4 h-4 text-[#4f7cff]" />
+                {t("sched.title")}
+              </p>
+              <p className="text-xs text-white/40 mt-1">
+                {t("sched.subtitle")}
+              </p>
+            </div>
+
+            <form
+              onSubmit={saveSchedule}
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
+            >
+              <label className="block">
+                <span className="block text-xs text-white/60 mb-1">
+                  {t("sched.frequency")}
+                </span>
+                <select
+                  value={schedFreq}
+                  onChange={(e) =>
+                    setSchedFreq(e.target.value as ScheduleFrequency)
+                  }
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#4f7cff]/50"
+                >
+                  <option value="daily" className="bg-[#0a1020]">
+                    {t("sched.daily")}
+                  </option>
+                  <option value="weekly" className="bg-[#0a1020]">
+                    {t("sched.weekly")}
+                  </option>
+                  <option value="monthly" className="bg-[#0a1020]">
+                    {t("sched.monthly")}
+                  </option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-xs text-white/60 mb-1">
+                  {t("sched.format")}
+                </span>
+                <select
+                  value={schedFormat}
+                  onChange={(e) =>
+                    setSchedFormat(e.target.value as "excel" | "ppt" | "pdf")
+                  }
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-[#4f7cff]/50"
+                >
+                  <option value="ppt" className="bg-[#0a1020]">
+                    PowerPoint
+                  </option>
+                  <option value="pdf" className="bg-[#0a1020]">
+                    PDF
+                  </option>
+                  <option value="excel" className="bg-[#0a1020]">
+                    Excel
+                  </option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-xs text-white/60 mb-1">
+                  {t("sched.emailPlaceholder")}
+                </span>
+                <input
+                  type="email"
+                  value={schedEmail}
+                  onChange={(e) => setSchedEmail(e.target.value)}
+                  placeholder={t("sched.emailPlaceholder")}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#4f7cff]/50"
+                />
+              </label>
+              <label className="block">
+                <span className="block text-xs text-white/60 mb-1">
+                  {t("sched.telegramPlaceholder")}
+                </span>
+                <input
+                  type="text"
+                  value={schedTelegram}
+                  onChange={(e) => setSchedTelegram(e.target.value)}
+                  placeholder={t("sched.telegramPlaceholder")}
+                  className="w-full bg-white/[0.03] border border-white/10 rounded-xl px-3 py-2 text-sm text-white placeholder-white/25 focus:outline-none focus:border-[#4f7cff]/50"
+                />
+              </label>
+              <div className="sm:col-span-2 lg:col-span-4 flex items-center gap-3">
+                <button
+                  type="submit"
+                  className="flex items-center gap-2 bg-[#4f7cff]/15 border border-[#4f7cff]/40 text-[#9db6ff] rounded-xl px-4 py-2 text-sm font-semibold hover:bg-[#4f7cff]/25 transition"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                  {t("sched.save")}
+                </button>
+                {schedSaved && (
+                  <span className="text-xs text-emerald-300">
+                    {t("sched.saved")}
+                  </span>
+                )}
+              </div>
+            </form>
+
+            {scheduled.filter((s) => s.workspaceId === workId).length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-white/50">
+                  {t("sched.activeTitle")}
+                </p>
+                {scheduled
+                  .filter((s) => s.workspaceId === workId)
+                  .map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-2 bg-white/[0.02] border border-white/10 rounded-xl px-3 py-2 text-sm"
+                    >
+                      <Clock className="w-4 h-4 text-white/50" />
+                      <span className="text-white/80">
+                        {s.name} · {t(frequencyLabelKey(s.frequency))} ·{" "}
+                        {s.format.toUpperCase()}
+                      </span>
+                      <span className="text-white/40 text-xs ml-auto">
+                        {t("sched.next")}{" "}
+                        {new Date(s.nextRunAt).toLocaleString()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => cancelSchedule(s.id)}
+                        className="text-white/40 hover:text-red-400 transition"
+                        aria-label={t("sched.cancel")}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+
+          {/* Export buttons */}
+          <div className="flex flex-wrap gap-2">
+            <ExportButton
+              label="Excel"
+              icon={FileDown}
+              onClick={() => handleExport("excel")}
+            />
+            <ExportButton
+              label="PowerPoint"
+              icon={Presentation}
+              onClick={() => handleExport("ppt")}
+            />
+            <ExportButton
+              label="PDF"
+              icon={FileText}
+              onClick={() => handleExport("pdf")}
+            />
+            <ExportButton
+              label="SQL"
+              icon={FileCode}
+              onClick={() => handleExport("sql")}
+            />
+            <ExportButton
+              label="JSON"
+              icon={FileJson}
+              onClick={() => handleExport("json")}
+            />
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              type="button"
+              onClick={() => setActiveStep(6)}
+              className="text-sm text-white/50 hover:text-white transition flex items-center gap-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+              {t("pipe.back")}
+            </button>
+            <button
+              type="button"
+              onClick={resetAll}
+              className="flex items-center gap-2 bg-white/5 border border-white/10 text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:bg-white/10 transition"
+            >
+              <RefreshCcw className="w-4 h-4" />
+              {t("pipe.again")}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// Sub-components
+// ============================================================
+
+function KpiTile({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-4">
+      <div className={`text-lg font-bold ${accent}`}>{value}</div>
+      <div className="text-xs text-white/50 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function ChartCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-5">
+      <p className="font-medium text-sm mb-2 truncate">{title}</p>
+      <div className="h-48">{children}</div>
+    </div>
+  );
+}
+
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div className="border border-white/10 rounded-3xl bg-white/[0.02] p-8 text-center text-white/50 text-sm">
+      {label}
+    </div>
+  );
+}
+
+function SummaryStat({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-3">
+      <div
+        className={`text-xl font-bold ${accent ? "text-[#4f7cff]" : "text-white"}`}
+      >
+        {value}
+      </div>
+      <div className="text-xs text-white/50 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function ExportButton({
+  label,
+  icon: Icon,
+  onClick,
+}: {
+  label: string;
+  icon: typeof FileDown;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white/80 hover:bg-[#4f7cff]/10 hover:border-[#4f7cff]/40 hover:text-[#4f7cff] transition"
+    >
+      <Icon className="w-4 h-4" />
+      {label}
+    </button>
+  );
+}
+
+function QuestionRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: "yes" | "no";
+  onChange: (v: "yes" | "no") => void;
+}) {
+  return (
+    <div className="border border-white/10 rounded-2xl bg-white/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
+      <p className="text-sm text-white/70 font-medium">{label}</p>
+      <div className="flex items-center gap-2">
+        {(["yes", "no"] as const).map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => onChange(v)}
+            className={`text-xs rounded-full px-3 py-1.5 border transition ${
+              value === v
+                ? "bg-[#4f7cff]/15 border-[#4f7cff]/50 text-[#4f7cff]"
+                : "bg-white/5 border-white/10 text-white/50 hover:text-white"
+            }`}
+          >
+            {v === "yes" ? "Yes" : "No"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ChartSection({
+  title,
+  why,
+  icon,
+  charts,
+  getKey,
+  selected,
+  onToggle,
+  t,
+}: {
+  title: string;
+  why: string;
+  icon: React.ReactNode;
+  charts: { column: string; title: string; image: string }[];
+  getKey: (c: { column: string; title: string; image: string }) => string;
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  t: (k: string, vars?: Record<string, string | number>) => string;
+}) {
+  if (!charts.length) return null;
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        {icon}
+        <h2 className="font-semibold">{title}</h2>
+      </div>
+      <p
+        className="text-xs text-white/50 px-1 flex items-start gap-1.5"
+        dir="auto"
+      >
+        <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        {why}
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {charts.map((c) => {
+          const id = getKey(c);
+          const active = selected.has(id);
+          return (
+            <div
+              key={id}
+              className="relative border border-white/10 rounded-3xl bg-white/[0.02] overflow-hidden"
+            >
+              <button
+                type="button"
+                onClick={() => onToggle(id)}
+                className={`absolute top-3 left-3 z-10 flex items-center gap-1.5 text-[11px] rounded-full px-3 py-1.5 border transition ${
+                  active
+                    ? "bg-[#4f7cff]/20 border-[#4f7cff]/60 text-[#4f7cff]"
+                    : "bg-white/[0.05] border-white/15 text-white/50 hover:text-white"
+                }`}
+              >
+                <CheckCircle2
+                  className={`w-3.5 h-3.5 ${active ? "" : "opacity-40"}`}
+                />
+                {t("pipe.chartUse")}
+              </button>
+              <img
+                src={c.image}
+                alt={c.title}
+                className="w-full max-h-64 object-contain bg-white/[0.02]"
+                loading="lazy"
+              />
+              <div className="px-4 py-2.5 border-t border-white/5">
+                <p className="text-xs font-medium text-white/80 truncate">
+                  {c.title}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

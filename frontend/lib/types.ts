@@ -3,7 +3,12 @@
 export type FileKind = "csv" | "xlsx" | "xls";
 
 export type ValidationCheckId =
-  "extension" | "size" | "empty" | "headers" | "duplicateHeaders" | "encoding";
+  | "extension"
+  | "size"
+  | "empty"
+  | "headers"
+  | "duplicateHeaders"
+  | "encoding";
 
 export interface ValidationCheck {
   id: ValidationCheckId;
@@ -74,7 +79,7 @@ export interface CleaningReport {
   recommendations: string[];
   columnConversions: { column: string; from: string; to: string }[];
   downloadUrl?: string;
-  sample?: any[];
+  sample?: Array<Record<string, string | number | boolean | null>>;
   alerts?: string[];
   summary?: string;
   processing_time_s?: number;

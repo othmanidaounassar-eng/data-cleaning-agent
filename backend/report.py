@@ -1,15 +1,19 @@
 # cspell:ignore OQZARO
 """Report generation utilities for OQZARO DataCleaning Agent."""
 
+from ai import explain_cleaning_with_log
+
+
 def generate_report(before: dict, after: dict, cleaning_report: dict, execution_time: float) -> dict:
     """
     Generate the final cleaning report with detailed log and column data types.
-    AI explanation is disabled – returns a fixed message.
+    AI explanation is produced by GROQ (falls back to a fixed message).
     """
     rows_before = before.get("rows", 0)
     rows_after = after.get("rows", 0)
 
     cleaning_log = cleaning_report.get("operations", [])
+    declined = cleaning_report.get("declined", [])
     alerts = cleaning_report.get("alerts", [])
     recommendations = cleaning_report.get("recommendations", [])
     sample = cleaning_report.get("sample", [])
@@ -44,11 +48,15 @@ def generate_report(before: dict, after: dict, cleaning_report: dict, execution_
         "cleaning_log": cleaning_log,
         "alerts": alerts,
         "recommendations": recommendations,
+        "declined": declined,
         "sample": sample,
         "summary": summary,
         "column_data_types": column_data_types,
-        # AI explanation is disabled – fixed message
-        "ai_explanation": "تم تنظيف البيانات بنجاح. راجع السجل التفصيلي للتغييرات.",
     }
+
+    if cleaning_log:
+        report["ai_explanation"] = explain_cleaning_with_log(rows_before, rows_after, cleaning_log)
+    else:
+        report["ai_explanation"] = "لم يتم تنفيذ أي عمليات تنظيف."
 
     return report

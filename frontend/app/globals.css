@@ -4,13 +4,59 @@
 @tailwind utilities;
 /* stylelint-enable at-rule-no-unknown */
 
+/* ============================================================
+   Theme tokens (dark default, light via html[data-theme="light"])
+   ============================================================ */
 :root {
   color-scheme: dark;
+
+  /* base palette (channels for <alpha-value> handling) */
+  --base-950: 7 9 15;
+  --base-900: 11 14 22;
+  --base-850: 16 20 31;
+  --base-800: 21 26 40;
+  --base-700: 29 35 51;
+  --base-600: 42 49 69;
+
+  /* ink text palette */
+  --ink-100: 237 239 245;
+  --ink-300: 183 189 204;
+  --ink-500: 136 145 165;
+
+  /* legacy surface colors */
+  --bg: #0a192f;
+  --bg-soft: #112240;
+  --bg-soft-2: #0f2444;
+  --line: #112240;
+  --text: #ffffff;
+  --accent: #4f7cff;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --base-950: 255 255 255;
+  --base-900: 248 250 252;
+  --base-850: 241 245 249;
+  --base-800: 226 232 240;
+  --base-700: 203 213 225;
+  --base-600: 148 163 184;
+
+  --ink-100: 15 23 42;
+  --ink-300: 51 65 85;
+  --ink-500: 100 116 139;
+
+  --bg: #ffffff;
+  --bg-soft: #f1f5f9;
+  --bg-soft-2: #e2e8f0;
+  --line: #cbd5e1;
+  --text: #0f172a;
+  --accent: #4f7cff;
 }
 
 @layer base {
   * {
-    border-color: #112240; /* dark-blue-800 */
+    border-color: var(--line);
   }
 
   html {
@@ -18,25 +64,43 @@
   }
 
   body {
-    background-color: #0a192f; /* dark-blue-900 */
-    color: #ffffff;
-    font-family: "Inter", sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body), "Inter", sans-serif;
     -webkit-font-smoothing: antialiased;
     background-image: radial-gradient(
       60% 50% at 50% -10%,
-      rgba(249, 115, 22, 0.15) 0%,
+      rgba(79, 124, 255, 0.15) 0%,
       rgba(10, 25, 47, 0.8) 45%,
       rgba(7, 9, 15, 0) 80%
     );
     background-repeat: no-repeat;
+    transition:
+      background-color 0.25s ease,
+      color 0.25s ease;
+  }
+
+  /* Arabic UI: prefer the Arabic webfont for readable glyphs and diacritics */
+  html[lang="ar"] body,
+  html[dir="rtl"] body {
+    font-family: var(--font-arabic), var(--font-body), "Inter", sans-serif;
+  }
+
+  :root[data-theme="light"] body {
+    background-image: radial-gradient(
+      60% 50% at 50% -10%,
+      rgba(79, 124, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.65) 45%,
+      rgba(7, 9, 15, 0) 80%
+    );
   }
 
   ::selection {
-    background: rgba(249, 115, 22, 0.35);
+    background: rgba(79, 124, 255, 0.35);
   }
 
   :focus-visible {
-    outline: 2px solid #f97316;
+    outline: 2px solid #4f7cff;
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -49,12 +113,112 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #112240;
+    background: var(--line);
     border-radius: 999px;
   }
   ::-webkit-scrollbar-thumb:hover {
     background: #1e3a8a;
   }
+}
+
+/* ============================================================
+   Light-theme overrides for legacy arbitrary classes
+   (dark-blue-900 family, text-white, muted grays)
+   ============================================================ */
+[data-theme="light"] .bg-dark-blue-900 {
+  background-color: var(--bg);
+}
+[data-theme="light"] .bg-dark-blue-800 {
+  background-color: var(--bg-soft);
+}
+[data-theme="light"] .bg-dark-blue-700 {
+  background-color: var(--bg-soft-2);
+}
+[data-theme="light"] .border-dark-blue-800,
+[data-theme="light"] .border-dark-blue-900 {
+  border-color: var(--line);
+}
+[data-theme="light"] .text-white {
+  color: var(--text);
+}
+[data-theme="light"] .text-white\/60 {
+  color: rgba(15, 23, 42, 0.6);
+}
+[data-theme="light"] .text-white\/70 {
+  color: rgba(15, 23, 42, 0.7);
+}
+[data-theme="light"] .text-white\/80 {
+  color: rgba(15, 23, 42, 0.8);
+}
+[data-theme="light"] .text-white\/90 {
+  color: rgba(15, 23, 42, 0.9);
+}
+[data-theme="light"] .text-gray-300 {
+  color: #334155;
+}
+[data-theme="light"] .text-gray-400 {
+  color: #64748b;
+}
+[data-theme="light"] .text-gray-500 {
+  color: #475569;
+}
+[data-theme="light"] .text-gray-600 {
+  color: #334155;
+}
+
+/* Keep white labels on filled action buttons in light mode */
+[data-theme="light"] [class~="bg-blue-500"],
+[data-theme="light"] [class~="bg-blue-600"],
+[data-theme="light"] [class~="bg-blue-700"],
+[data-theme="light"] [class~="bg-green-500"],
+[data-theme="light"] [class~="bg-green-600"],
+[data-theme="light"] [class~="bg-green-700"],
+[data-theme="light"] [class~="bg-blue-500"],
+[data-theme="light"] [class~="bg-blue-600"],
+[data-theme="light"] [class~="bg-red-500"],
+[data-theme="light"] [class~="bg-red-600"] {
+  color: #ffffff;
+}
+
+/* White-alpha micro surfaces / borders used by the token pages + topbar */
+[data-theme="light"] .border-white\/\[0\.06\],
+[data-theme="light"] .border-white\/\[0\.05\] {
+  border-color: rgba(15, 23, 42, 0.08);
+}
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(15, 23, 42, 0.12);
+}
+[data-theme="light"] .bg-white\/\[0\.03\],
+[data-theme="light"] .bg-white\/\[0\.04\] {
+  background-color: rgba(15, 23, 42, 0.04);
+}
+[data-theme="light"] .bg-white\/5 {
+  background-color: rgba(15, 23, 42, 0.05);
+}
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(15, 23, 42, 0.08);
+}
+[data-theme="light"] .glass {
+  background: rgba(255, 255, 255, 0.62);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+}
+[data-theme="light"] .glass-strong {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  box-shadow: 0 8px 48px rgba(15, 23, 42, 0.12);
+}
+
+/* Slim the radial "aurora" used on the landing page under light mode */
+[data-theme="light"] .bg-grad-radial-glow {
+  background-image: radial-gradient(
+    60% 60% at 50% 0%,
+    rgba(79, 124, 255, 0.12) 0%,
+    rgba(139, 92, 246, 0.05) 45%,
+    rgba(7, 9, 15, 0) 80%
+  );
 }
 
 @layer components {
@@ -73,7 +237,7 @@
   }
 
   .text-gradient {
-    background: linear-gradient(to right, #f97316, #ea580c);
+    background: linear-gradient(to right, #4f7cff, #8b5cf6);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

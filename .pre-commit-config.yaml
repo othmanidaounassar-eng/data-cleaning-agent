@@ -49,15 +49,15 @@ repos:
         files: ^frontend/
         additional_dependencies: [prettier@3.2.5]
 
-  # 5. ESLint (جودة الكود)
-  - repo: https://github.com/pre-commit/mirrors-eslint
-    rev: v8.56.0
-    hooks:
-      - id: eslint
-        files: ^frontend/
-        args: [--fix, --ext, .ts,.tsx,.js,.jsx]
-        additional_dependencies:
-          - eslint@8.56.0
-          - '@typescript-eslint/parser@6.19.0'
-          - '@typescript-eslint/eslint-plugin@6.19.0'
-          - eslint-config-next@14.1.0
+  # 5. ESLint (جودة الكود) — معطّل مؤقتاً بسبب مشكلة مسار flat config
+  # - repo: https://github.com/pre-commit/mirrors-eslint
+  #   rev: v8.56.0
+  #   hooks:
+  #     - id: eslint
+  #       files: ^frontend/
+  #       args: [--fix]
+  #       additional_dependencies:
+  #         - eslint@8.56.0
+  #         - '@typescript-eslint/parser@6.19.0'
+  #         - '@typescript-eslint/eslint-plugin@6.19.0'
+  #         - eslint-config-next@14.1.0

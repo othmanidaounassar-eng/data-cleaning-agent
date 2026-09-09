@@ -58,6 +58,8 @@ cover/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
+oqzaro.db
+oqzaro.db-journal
 
 # Flask stuff:
 instance/
@@ -163,6 +165,10 @@ node_modules/
 app.db
 *.log
 bandit-report.json
+backend/full_out.txt
+backend/out*.txt
+backend/test_out.txt
+backend/server_*.log
 
 # Frontend: Next.js build
 .next/

@@ -1,42 +1,71 @@
 // frontend/app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { gunzip } from "zlib";
+import { promisify } from "util";
+import { BACKEND_URL, backendHeaders } from "@/lib/backend";
 
-// Backend runs on port 8000 (backend/main.py)
-const BACKEND_URL = process.env.BACKEND_API_URL || "http://localhost:8000";
-
-// ✅ تم إضافة هذا السطر لطباعة الرابط المستخدم في سجلات Vercel
-console.log(`🔗 [Vercel] BACKEND_URL = ${BACKEND_URL}`);
+const gunzipAsync = promisify(gunzip);
+const MAX_DECOMPRESSED_BYTES = 256 * 1024 * 1024;
 
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const file = formData.get("file");
+    const isGzip = (request.headers.get("content-encoding") || "").includes(
+      "gzip",
+    );
 
-    if (!file || !(file instanceof File)) {
-      return NextResponse.json(
-        { error: "ملف غير صالح أو غير موجود" },
-        { status: 400 },
-      );
+    let body: BodyInit;
+    let contentType = request.headers.get("content-type") || "";
+
+    if (isGzip) {
+      // Compressed multipart: decompress and forward the raw bytes unchanged,
+      // keeping the original multipart boundary so FastAPI parses it natively.
+      const compressed = Buffer.from(await request.arrayBuffer());
+      const raw = await gunzipAsync(compressed);
+      if (raw.length > MAX_DECOMPRESSED_BYTES) {
+        return NextResponse.json(
+          { error: "File exceeds the maximum supported size." },
+          { status: 413 },
+        );
+      }
+      body = new Uint8Array(raw);
+    } else {
+      const formData = await request.formData();
+      const file = formData.get("file");
+
+      if (!file || !(file instanceof File)) {
+        return NextResponse.json(
+          { error: "ملف غير صالح أو غير موجود" },
+          { status: 400 },
+        );
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: file.type });
+      const backendFormData = new FormData();
+      backendFormData.append("file", blob, file.name);
+      backendFormData.append("plan", (formData.get("plan") as string) || "");
+
+      body = backendFormData;
+      contentType = "";
     }
 
-    const arrayBuffer = await file.arrayBuffer();
-    const blob = new Blob([arrayBuffer], { type: file.type });
-    const backendFormData = new FormData();
-    backendFormData.append("file", blob, file.name);
-
-    const response = await fetch(`${BACKEND_URL}/clean`, {
+    const response = await fetch(`${BACKEND_URL}/upload`, {
       method: "POST",
-      body: backendFormData,
+      body,
+      headers: backendHeaders(
+        request,
+        contentType ? { "Content-Type": contentType } : undefined,
+      ),
       signal: AbortSignal.timeout(300000),
     });
 
     const responseText = await response.text();
-    const contentType = response.headers.get("content-type") || "";
+    const responseContentType = response.headers.get("content-type") || "";
 
-    if (!contentType.includes("application/json")) {
+    if (!responseContentType.includes("application/json")) {
       console.error("❌ Backend returned non-JSON:", responseText);
       return NextResponse.json(
-        { error: `Backend error: ${responseText || "Unknown response"}` },
+        { error: "الخادم الخلفي أرجَع استجابة غير متوقعة. حاول مرة أخرى." },
         { status: response.status },
       );
     }
@@ -47,18 +76,14 @@ export async function POST(request: NextRequest) {
     } catch (parseError) {
       console.error("❌ JSON parse error:", parseError);
       return NextResponse.json(
-        {
-          error: `Invalid JSON from backend: ${responseText.substring(0, 200)}`,
-        },
-        { status: response.status },
+        { error: "تعذّرت قراءة استجابة الخادم. حاول مرة أخرى." },
+        { status: 502 },
       );
     }
 
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     console.error("❌ Proxy Error:", error);
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown error";
 
     if (error instanceof Error && error.name === "TimeoutError") {
       return NextResponse.json(
@@ -68,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: `Proxy error: ${errorMessage}` },
+      { error: "تعذّرت المعالجة. حاول مرة أخرى." },
       { status: 500 },
     );
   }
